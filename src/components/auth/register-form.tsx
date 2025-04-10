@@ -1,6 +1,6 @@
 "use client";
 
-import CardWrapper from "./card-wrapper"
+import CardWrapper from "./card-wrapper";
 import {
   Form,
   FormControl,
@@ -8,35 +8,65 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
+  FormMessage,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { RegisterSchema } from "@root/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form"
+import { useForm } from "react-hook-form";
 import { Input } from "../ui/input";
-import type { z } from "zod"; 
-import { useFormStatus } from "react-dom";
-import { useState } from "react";
+import type { z } from "zod";
+import { useState, useEffect } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UserIcon, MailIcon, LockIcon, PhoneIcon, MapPinIcon } from "lucide-react";
+import axios from "axios"; // Import axios for making API requests
+
+interface Country {
+  name: {
+    common: string;
+  };
+  cca2: string; // Or any other unique identifier
+}
 
 type FormData = z.infer<typeof RegisterSchema>;
 
 const RegisterForm = () => {
   const [loading, setLoading] = useState(false);
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const form = useForm<FormData>({
     resolver: zodResolver(RegisterSchema),
-    defaultValues:{
+    defaultValues: {
+      username: "",
+      fullname: "",
       email: "",
-      name: "",
       password: "",
-      confirmPassword: ""
-    }
-  })
+      confirmPassword: "",
+      phoneNumber: "",
+      country: "",
+    },
+  });
+
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const response = await axios.get<Country[]>("https://restcountries.com/v3.1/all?fields=name,cca2"); // Example API endpoint
+        setCountries(response.data);
+      } catch (error: any) {
+        console.error("Error fetching countries:", error);
+        setFetchError("Failed to load countries. Please try again later.");
+      }
+    };
+
+    fetchCountries();
+  }, []); // Empty dependency array means this effect runs once after the initial render
+
   const onSubmit = (data: FormData) => {
     setLoading(true);
-    console.log(data)
-  }
-  const { pending } = useFormStatus();
+    console.log(data);
+    // In a real application, you would send the registration data to your backend here
+  };
+
   return (
     <CardWrapper
     label="Create an Account"
@@ -49,26 +79,54 @@ const RegisterForm = () => {
         <div className="space-y-4">
           <FormField
             control={form.control}
-            name="email"
+            name="username"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>Username <span className="text-red-500">*</span></FormLabel>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <UserIcon className="h-4 w-4 text-gray-500" />
+                    </div>
                 <FormControl>
-                    <Input {...field} type="email" placeholder="Enter your email"  />
+                    <Input {...field} type="text" placeholder="Enter your username" className="pl-10 h-10 text-lg" />
                 </FormControl>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
             />
-            <FormField
+          <FormField
             control={form.control}
-            name="name"
+            name="fullname"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
+                <FormLabel>Full Name <span className="text-red-500">*</span></FormLabel>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <UserIcon className="h-4 w-4 text-gray-500" />
+                    </div>
                 <FormControl>
-                    <Input {...field}  placeholder="John Doe"  />
+                    <Input {...field} type="text" placeholder="John Doe" className="pl-10 h-10 text-lg" />
                 </FormControl>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+            />  
+            <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email<span className="text-red-500">*</span></FormLabel>      
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <MailIcon className="h-4 w-4 text-gray-500" />
+                   </div>
+                <FormControl>
+                    <Input {...field} type="email" placeholder="johndoe@email.com" className="pl-10 h-10 text-lg"  />
+                </FormControl>
+                  </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -78,10 +136,15 @@ const RegisterForm = () => {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>Password <span className="text-red-500">*</span></FormLabel>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <LockIcon className="h-4 w-4 text-gray-500" />
+                    </div>
                 <FormControl>
-                    <Input {...field} type="password" placeholder="********"  />
+                    <Input {...field} type="password" placeholder="********"  className="pl-10 h-10 text-lg"  />
                 </FormControl>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -91,18 +154,77 @@ const RegisterForm = () => {
             name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
+                <FormLabel>Confirm Password <span className="text-red-500">*</span></FormLabel>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <LockIcon className="h-4 w-4 text-gray-500" /> {/* You might reuse the lock icon */}
+                    </div>
                 <FormControl>
-                    <Input {...field} type="password" placeholder="********"  />
+                    <Input {...field} type="password" placeholder="********" className="pl-10 h-10 text-lg" />
                 </FormControl>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
             />
+            <FormField
+            control={form.control}
+            name="phoneNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone Number</FormLabel>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <PhoneIcon className="h-4 w-4 text-gray-500" /> {/* Example icon for country */}
+                  </div>
+                <FormControl>
+                    <Input {...field} type="tel" placeholder="+*** **** *** ***"  className="pl-10 h-10 text-lg" />
+                </FormControl>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
+            name="country"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Country <span className="text-red-500">*</span></FormLabel>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <MapPinIcon className="h-4 w-4 text-gray-500" /> {/* Example icon for country */}
+                  </div>
+                  <FormControl>
+                    <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={countries.length === 0 || fetchError !== null}
+                  >
+                    <FormControl>
+                    <SelectTrigger className="pl-10 h-10 w-full">
+                      <SelectValue placeholder="Select your country" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {fetchError && <div>{fetchError}</div>}
+                      {countries.map((country) => (
+                        <SelectItem key={country.cca2} value={country.name.common}>
+                          {country.name.common}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  </FormControl>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          <Button type="submit" className="w-full">
-            {loading ? "loading...": "Register"}
-            </Button>
+          <Button type="submit" className="w-full" disabled={loading || countries.length === 0 || fetchError !== null}>
+            {loading ? "loading..." : "Register"}
+          </Button>
       </form>
     </Form>
     </CardWrapper>

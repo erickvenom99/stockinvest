@@ -16,8 +16,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form"
 import { Input } from "../ui/input";
 import type { z } from "zod"; 
-import { useFormStatus } from "react-dom";
+import { UserIcon, MailIcon, LockIcon } from "lucide-react";
 import { useState } from "react";
+
 
 type FormData = z.infer<typeof LoginSchema>;
 
@@ -34,7 +35,7 @@ const LoginForm = () => {
     setLoading(true);
     console.log(data)
   }
-  const { pending } = useFormStatus();
+
   return (
     <CardWrapper
     label="Login to your Account"
@@ -45,15 +46,20 @@ const LoginForm = () => {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
-          <FormField
+            <FormField
             control={form.control}
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>Email<span className="text-red-500">*</span></FormLabel>      
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <MailIcon className="h-4 w-4 text-gray-500" />
+                   </div>
                 <FormControl>
-                    <Input {...field} type="email" placeholder="Enter your email"  />
+                    <Input {...field} type="email" placeholder="johndoe@email.com" className="pl-10 h-10 text-lg"  />
                 </FormControl>
+                  </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -63,16 +69,21 @@ const LoginForm = () => {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>Password <span className="text-red-500">*</span></FormLabel>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <LockIcon className="h-4 w-4 text-gray-500" />
+                    </div>
                 <FormControl>
-                    <Input {...field} type="password" placeholder="********"  />
+                    <Input {...field} type="password" placeholder="********"  className="pl-10 h-10 text-lg"  />
                 </FormControl>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={pending }>
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Loading....": "Login"}
             </Button>
       </form>
