@@ -22,7 +22,11 @@ export const RegisterSchema = z.object({
   country: z.string().min(1, {
     message: "Country is required",
   }),
+  referralID : z.string().min(1, {
+    message: "Referral id  is required",
+  }),
 })
+
 
 export const LoginSchema = z.object({
     email: z.string().email({

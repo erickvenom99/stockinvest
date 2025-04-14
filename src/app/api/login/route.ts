@@ -1,9 +1,12 @@
 // src/app/api/login/route.ts
 import { NextResponse, NextRequest } from 'next/server';
 import connectDB from '@/lib/db';
-import User from '@/lib/models/user'; // Importing the User model using your schema
+import User from '@/lib/models/user'; 
+import jwt from 'jsonwebtoken';
 
 export async function POST(req: NextRequest) {
+  const JWT_SECRET = process.env.JWT_SECRET as string;
+
   try {
     await connectDB();
 
@@ -26,7 +29,14 @@ export async function POST(req: NextRequest) {
     if (!isPasswordMatch) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
+    const payload = {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      isVerified: user.isVerified,
+    };
 
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' }); // Token expiration time can be adjusted
     // Update last login time
     user.lastLogin = new Date();
     await user.save();
@@ -41,9 +51,9 @@ export async function POST(req: NextRequest) {
           username: user.username,
           fullname: user.fullname,
           email: user.email,
-          isVerified: user.isVerified,
-          // Do not include password or sensitive information here
+          isVerified: user.isVerified,// Do not include password or sensitive information here
         },
+        token: token,
       },
       { status: 200 }
     ); // 200 OK
