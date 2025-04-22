@@ -51,10 +51,6 @@ const LoginForm = () => {
 
       if (response.ok) {
         console.log("Login successful:", responseData);
-        localStorage.setItem('authToken', responseData.token )
-        console.log("JWT stored:", localStorage.getItem("authToken")); 
-        // Store user information (e.g., in local storage or state management)
-        // Redirect the user to a protected page (e.g., dashboard)
         router.push("/dashboard"); // Replace "/dashboard" with your desired route
       } else {
         console.error("Login failed:", responseData);

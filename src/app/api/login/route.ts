@@ -4,9 +4,9 @@ import connectDB from '@/lib/db';
 import User from '@/lib/models/user'; 
 import jwt from 'jsonwebtoken';
 
-export async function POST(req: NextRequest) {
-  const JWT_SECRET = process.env.JWT_SECRET as string;
+const JWT_SECRET = process.env.JWT_SECRET as string;
 
+export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
@@ -29,34 +29,34 @@ export async function POST(req: NextRequest) {
     if (!isPasswordMatch) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
-    const payload = {
-      id: user._id,
+    const tokenPayload = {
+      id: user._id.toString(),
       username: user.username,
       email: user.email,
       isVerified: user.isVerified,
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' }); // Token expiration time can be adjusted
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '1h' }); // Token expiration time can be adjusted
     // Update last login time
     user.lastLogin = new Date();
     await user.save();
 
     // Create a session or JWT here (we'll implement this in a later step)
     // For now, let's just return basic user info
-    return NextResponse.json(
-      {
-        message: 'Login successful',
-        user: {
-          id: user._id,
-          username: user.username,
-          fullname: user.fullname,
-          email: user.email,
-          isVerified: user.isVerified,// Do not include password or sensitive information here
-        },
-        token: token,
-      },
+    const response = NextResponse.json(
+      { message: 'Login successful', user: { id: user._id, username: user.username, fullname: user.fullname, email: user.email } },
       { status: 200 }
-    ); // 200 OK
+    );
+    response.cookies.set({
+      name: 'authToken',
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // Same expiry as the token
+      sameSite: 'lax',
+    });
+    return response// 200 OK
 
   } catch (error: any) {
     console.error('Login failed:', error);
