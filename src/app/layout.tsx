@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+//import type { Metadata } from "next";
 import "./globals.css";
 
 export default function RootLayout({
@@ -8,9 +8,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head />
       <body>
-        {children}
-      </body>
-    </html>
+          {children}
+    </body>
+  </html>
   );
 }

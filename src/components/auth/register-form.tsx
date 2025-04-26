@@ -105,7 +105,7 @@ const RegisterForm = () => {
         // You can also handle specific error messages from the backend here,
         // for example, if (responseData.error === 'Username already exists') { ... }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error during registration:", error);
       setRegistrationError("An unexpected error occurred");
     } finally {

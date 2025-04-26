@@ -18,6 +18,7 @@ import type { z } from "zod";
 import { UserIcon, MailIcon, LockIcon } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation"; // Import useRouter for redirection
+import { useUser } from '@/contexts/user/user-context';
 
 type FormData = z.infer<typeof LoginSchema>;
 
@@ -25,6 +26,7 @@ const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); // State for login errors
   const router = useRouter(); // Initialize the router
+  const { fetchUser } = useUser();
 
   const form = useForm<FormData>({
     resolver: zodResolver(LoginSchema),
@@ -47,16 +49,15 @@ const LoginForm = () => {
         body: JSON.stringify(data),
       });
 
-      const responseData = await response.json();
-
-      if (response.ok) {
-        console.log("Login successful:", responseData);
-        router.push("/dashboard"); // Replace "/dashboard" with your desired route
-      } else {
-        console.error("Login failed:", responseData);
-        setError(responseData.message || "Invalid credentials");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Login failed');
       }
-    } catch (e: any) {
+
+      await fetchUser();
+      router.push('/dashboard');
+
+    } catch (e) {
       console.error("Error during login:", e);
       setError("An unexpected error occurred");
     } finally {
