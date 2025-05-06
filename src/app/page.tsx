@@ -1,9 +1,23 @@
-const Home = () => {
+import { Navbar } from "@/components/navbar"
+import { HeroSection } from "@/components/hero-section"
+import { SecondHeroSection } from "@/components/second-hero-section"
+import { SubscriptionCards } from "@/components/subscription-cards"
+import { MarketCap } from "@/components/market-cap"
+import { TradingViewWidget } from "@/components/trading-view-widget"
+import { Footer } from "@/components/footer"
+
+export default function Home() {
   return (
-    <div>
-      <h1>Home</h1>
+    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-gray-950 dark:to-gray-900">
+      <main className="mx-auto max-w-7xl px-4">
+        <Navbar />
+        <HeroSection />
+        <SecondHeroSection />
+        <SubscriptionCards />
+        <MarketCap />
+        <TradingViewWidget />
+      </main>
+      <Footer />
     </div>
   )
 }
-
-export default Home
