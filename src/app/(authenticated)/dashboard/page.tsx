@@ -1,11 +1,128 @@
-// app/(authenticated)/dashboard/page.tsx
+'use client';
+import Image from "next/image"
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, ArrowDownRight, Wallet, Coins, Clock, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { motion, AnimatePresence } from 'framer-motion'
+import { cn } from '@/lib/utils'
+import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog"
+import SendModal from "@/components/SendModal";
+import { Plan, PLANS } from '@/types/plan';
+
+interface CryptoData {
+  id: string
+  name: string
+  current_price: number
+  price_change_percentage_24h: number
+  symbol: string
+  image?: string
+  price_change_24h: number
+}
+
+interface SendModalState {
+  currency: 'BTC' | 'USDT'
+  selectedPlan: Plan | null
+  verificationStatus: 'idle' | 'pending' | 'verified' | 'failed'
+  verificationStarted: boolean
+  isCopied: boolean
+}
+
 
 export default function DashboardPage() {
+  const [marketData, setMarketData] = useState<CryptoData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeAction, setActiveAction] = useState<'send' | 'receive' | 'history'>('send')
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [sendModalState, setSendModalState] = useState<SendModalState>({
+    currency: 'BTC',
+    selectedPlan: null,
+    verificationStatus: 'idle',
+    verificationStarted: false,
+    isCopied: false
+  })
+
+  const resetSendModalState = () => {
+    setSendModalState(prev => ({
+      ...prev,
+      currency: 'BTC',
+      selectedPlan: null,
+      isCopied: false
+    }));
+  };
+
+  const sendModalProps = {
+    currency: sendModalState.currency,
+    selectedPlan: sendModalState.selectedPlan,
+    verificationStatus: sendModalState.verificationStatus,
+    verificationStarted: sendModalState.verificationStarted,
+    isCopied: sendModalState.isCopied,
+    setCurrency: (currency: 'BTC' | 'USDT') => setSendModalState(prev => ({ ...prev, currency })),
+    setSelectedPlan: (plan: Plan | null) => setSendModalState(prev => ({ ...prev, selectedPlan: plan })),
+    setVerificationStatus: (status: 'idle' | 'pending' | 'verified' | 'failed') => setSendModalState(prev => ({ ...prev, verificationStatus: status })),
+    setVerificationStarted: (started: boolean) => setSendModalState(prev => ({ ...prev, verificationStarted: started })),
+    setIsCopied: (copied: boolean) => setSendModalState(prev => ({ ...prev, isCopied: copied }))
+  };
+  
+
+  useEffect(() => {
+    let isMounted = true
+    const controller = new AbortController()
+
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/api/market-data', {
+          signal: controller.signal
+        })
+        
+        if (!response.ok) throw new Error('Failed to fetch')
+        
+        const data = await response.json()
+        if (isMounted) {
+          setMarketData(data)
+          setError(null)
+        }
+      } catch (error) {
+          if (isMounted) {
+            setError(`Failed to load latest data. Showing cached information.`)
+            console.error('Error: ', error)
+          }
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, 5000)
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+      controller.abort()
+    }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className='space-y-6'>
+        <Skeleton className='h-[300px] w-full' />
+        <div className='grid gap-4 md:grid-cols-4'>
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className='h-24 w-full' />
+          ))}
+        </div>
+        <Skeleton className='h-[400px] w-full' />
+      </div>
+    )
+  }
   return (
     <div className="space-y-6">
+      {error && (
+        <div className='p-4 bg-yellow-100 border boerder-yellow-200 rounded-lg'>
+          ⚠️ {error}
+        </div>
+      )}
       {/* Section 1: Portfolio Overview */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="col-span-2">
@@ -28,36 +145,79 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold">Asset Allocation</h3>
+            <h3 className='text-lg font-semibold'> Asset Allocation</h3>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-blue-500 rounded-full" />
-                <span>Bitcoin (BTC)</span>
-              </div>
-              <div className="font-mono">54%</div>
-            </div>
-            {/* Repeat for other assets */}
+          <CardContent className='space-y-4'>
+            {marketData.slice(0, 6).filter((coin) => coin.symbol.toUpperCase() !== 'USDT').map((coin) => {
+              const isPositive = coin.price_change_percentage_24h >= 0
+              return (
+              <div key={coin.id} className='flex items-center justify-between'>
+                <div className='flex items-center space-x-2'>
+                  {coin.image && (
+                    <div className='shrink-0'>
+                      <Image 
+                        src={coin.image}
+                        alt={coin.name}
+                        width={32}
+                        height={32}
+                        className="rounded-full object-contain"
+                        unoptimized
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )} 
+                  <span className='align-middle'>
+                      {coin.name} ({coin.symbol.toUpperCase()})
+                  </span>
+                </div>
+                <AnimatePresence mode='wait'>
+                  <motion.div
+                    key={coin.price_change_percentage_24h}
+                    initial={{ y: isPositive ? 10 : -10, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className={cn(
+                      'font-mono flex items-center gap-1',
+                      isPositive ? 'text-green-500' : 'text-red-500'
+                    )}
+                  >
+                    {isPositive ? '↑' : '↓'}
+                    {coin.price_change_percentage_24h.toFixed(1)}%
+                  </motion.div>
+                </AnimatePresence>
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
       </div>
 
       {/* Section 2: Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Button className="h-24 flex flex-col items-center justify-center space-y-2">
-          <Plus className="w-6 h-6" />
-          <span>Buy Crypto</span>
-        </Button>
-        <Button variant="secondary" className="h-24 flex flex-col items-center justify-center space-y-2">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Button 
+          variant={activeAction === 'send' ? 'default' : 'secondary'}
+          className="h-24 flex flex-col items-center justify-center space-y-2 transition-all cursor-pointer hover:shadow-md"
+          onClick={() => { setActiveAction('send'); setShowActionModal(true);}}
+        >
           <ArrowUpRight className="w-6 h-6" />
           <span>Send</span>
         </Button>
-        <Button variant="secondary" className="h-24 flex flex-col items-center justify-center space-y-2">
+        <Button 
+          variant={activeAction === 'receive' ? 'default' : 'secondary'}
+          className="h-24 flex flex-col items-center justify-center space-y-2 transition-all"
+          onClick={() => setActiveAction('receive')}
+        >
           <ArrowDownRight className="w-6 h-6" />
           <span>Receive</span>
         </Button>
-        <Button variant="secondary" className="h-24 flex flex-col items-center justify-center space-y-2">
+        <Button 
+          variant={activeAction === 'history' ? 'default' : 'secondary'}  
+          className="h-24 flex flex-col items-center justify-center space-y-2 transition-all"
+          onClick={() => setActiveAction('history')}
+        >
           <Clock className="w-6 h-6" />
           <span>History</span>
         </Button>
@@ -65,28 +225,117 @@ export default function DashboardPage() {
 
       {/* Section 3: Market Overview */}
       <Card>
-        <CardHeader>
-          <h3 className="text-lg font-semibold">Your Assets</h3>
+        <CardHeader className='flex justify-between'>
+          <h3 className="text-lg font-semibold">Market Overview</h3>
+          {/* Live Status Indicator */}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 text-sm text-green-500">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            LIVE PRICES
+          </div>
+          <span className="text-xs text-muted-foreground">
+            Updated every 5 seconds
+          </span>
+        </div>
+
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-yellow-500 rounded-full" />
-                <div>
-                  <div className="font-medium">Bitcoin (BTC)</div>
-                  <div className="text-sm text-muted-foreground">0.54 BTC</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-medium">$23,450.00</div>
-                <div className="text-sm text-green-500">+1.2%</div>
-              </div>
-            </div>
-            {/* Repeat for other assets */}
+            {marketData.slice(0, 10).map((coin) => {
+              const isPositive = coin.price_change_percentage_24h >= 0
+              const currentPrice = coin.current_price
+              const priceDecimal = currentPrice < 1 ? 6 : 2 //currentPrice < 10 ? 4 : 2
+              
+              return (
+                <motion.div
+                  key={coin.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className={cn(
+                    'flex items-center justify-between p-3 rounded-lg transition-colors',
+                    isPositive ? 'bg-green-50/50' : 'bg-red-50/50'
+                  )}
+                >
+                  <div className='flex items-center space-x-3'>
+                    {coin.image && (
+                      <div className="relative w-8 h-8">
+                        <Image
+                          src={coin.image}
+                          alt={coin.name}
+                          width={32}
+                          height={32}
+                          className="rounded-full object-contain"
+                          unoptimized
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <div className='font-medium'>{coin.name}</div>
+                      <div className='text-sm text-muted-foreground'>
+                        {coin.symbol.toUpperCase()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className='text-right'>
+                    <AnimatePresence mode='wait'>
+                      <motion.div
+                        key={currentPrice}
+                        initial={{ y: isPositive ? 10 : -10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={cn(
+                          'font-medium',
+                          // isPositive ? 'text-green-600' : 'text-red-600'
+                        )}
+                      >
+                        ${currentPrice.toLocaleString(undefined, {
+                          minimumFractionDigits: priceDecimal,
+                          maximumFractionDigits: priceDecimal
+                        })}
+                      </motion.div>
+                    </AnimatePresence>
+                    <div className={cn(
+                      'text-sm flex items-center justify-end gap-1',
+                      isPositive ? 'text-green-500' : 'text-red-500'
+                    )}>
+                      {isPositive ? '↑' : '↓'}
+                      {coin.price_change_percentage_24h.toFixed(2)}%
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
           </div>
         </CardContent>
       </Card>
+      <Dialog 
+        open={showActionModal} 
+        onOpenChange={(open) => {
+          setShowActionModal(open);
+          if (!open) {
+            setActiveAction('send');
+            resetSendModalState();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px] border-0 rounded-xl shadow-xl bg-background sm:top-[50%] sm:translate-y-[-50%] bottom-0 top-auto h-[95vh] max-h-[100dvh] flex flex-col overflow-hidden">
+          <div className="absolute inset-0 rounded-xl border-2 border-primary/10 backdrop-blur-sm" />
+          <div className="relative z-10 h-full flex flex-col">
+            <DialogHeader className="shrink-0 px-6 pt-6 pb-3">
+              <h3 className='text-lg font-semibold capitalize'>{activeAction}</h3>
+            </DialogHeader>
+      
+            <div className="flex-1 overflow-y-auto px-6 pb-6" key={activeAction}>
+              {activeAction === 'send' && <SendModal {...sendModalProps} />}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

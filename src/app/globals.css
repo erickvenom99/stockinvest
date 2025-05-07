@@ -119,3 +119,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+button, .interactive {
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+.SelectContent {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.SelectItem {
+  transition: transform 0.1s ease, background-color 0.2s ease;
+}

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import transaction from "./models/transaction";
 
 const MONGO_URI = process.env.MONGO_URI;
 
@@ -29,6 +30,8 @@ const connectDB = async () => {
         cache.promise = null;
         throw e;
     }
+
+    await transaction.syncIndexes()
 
     return cache.conn;
 };
