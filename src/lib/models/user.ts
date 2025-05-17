@@ -59,7 +59,9 @@ const userSchema = new Schema(
     lastLogin: {
       type: Date,
     },
+  
   },
+
   {
     timestamps: true, // Adds createdAt and updatedAt
     toJSON: { virtuals: true }, // Include virtuals when converting to JSON
@@ -70,9 +72,19 @@ const userSchema = new Schema(
 // Password hashing middleware
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 10); // Increased salt rounds for better security
-  next();
+  try {
+    const salt = await bcrypt.genSalt(10)
+    this.password = await bcrypt.hash(this.password, salt)
+    next()
+    console.log("Pre-save hook: password modified?", this.isModified('password'));
+    console.log("Password before hash:", this.password?.substring(0, 10));
+  }
+  catch (error) {
+    next(error as Error)
+  }
 });
+
+
 
 // Method to compare passwords
 userSchema.methods.comparePassword = async function (

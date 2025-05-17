@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import AuthHeader from "./auth-header";
 import BackButton from "./back-button";
+import ForgetButton from "./forget-password";
 
 
 
@@ -17,9 +18,10 @@ interface CardWrapperProps {
     backButtonHref: string
     backButtonLabel: string 
     children: React.ReactNode
+    showForgetButton?: boolean;
 }
 
-const CardWrapper = ({ label, title, backButtonHref,  backButtonLabel, children}: CardWrapperProps) => {
+const CardWrapper = ({ label, title, backButtonHref,  backButtonLabel,  children, showForgetButton = true }: CardWrapperProps) => {
   return (
     <Card className="xl:w-1/3 md:w-1/2 shadow-md">
         <CardHeader>
@@ -28,9 +30,11 @@ const CardWrapper = ({ label, title, backButtonHref,  backButtonLabel, children}
         <CardContent>
             {children}
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex flex-col space-y-2 items-center">
             <BackButton label={backButtonLabel} href={backButtonHref} />
+            { showForgetButton && <ForgetButton /> }
         </CardFooter>
+        
     </Card>
   )
 }
