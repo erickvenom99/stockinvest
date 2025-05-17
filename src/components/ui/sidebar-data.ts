@@ -1,127 +1,62 @@
-import {
-  Home,
-  PieChart,
-  BarChart2,
-  List,
-//   ShoppingCart,
-  CreditCard,
-  TrendingUp,
-  Settings,
-  User,
-  Shield,
-  Sliders,
-  LifeBuoy,
-} from "lucide-react";
+import { Home, PieChart, LineChart, CreditCard, BarChart3, Users, LifeBuoy } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
-export type SideBarEntry = 
-| {
-    type: "link";
-    title: string;
-    url: string;
-    icon: React.ComponentType;
+export type SideBarRoute = {
+  title: string
+  url: string
+  icon: LucideIcon
+  section?: "main" | "other"
 }
 
-| {
-    type: "group";
-    title: string;
-    icon?: React.ComponentType;
-    children: {
-        title: string;
-        url: string;
-        icon: React.ComponentType;
-    }[];
-};
-
-export const sideBarEntries: SideBarEntry[] = [
-    {
-        type: "link",
-        title: "Dashboard",
-        url: "/dashboard",
-        icon: Home,
-    },
-    {
-        type: "group",
-        title: "Portfolio",
-        icon: PieChart,
-        children: [
-            {
-                title: "Overview",
-                url: "/portfolio/overview",
-                icon: BarChart2,
-            },
-            {
-                title: "Holdings",
-                url: "/portfolio/holdings",
-                icon: List
-            },
-            {
-                title: "Performance",
-                url: "/portfolio/performance",
-                icon: TrendingUp,
-            },
-        ],
-    },
-    {
-        type: "link",
-        title: "Watchlist",
-        url: "/watchlist",
-        icon: List,
-    },
-    {
-        type: "group",
-        title: "Wallet",
-        icon: CreditCard,
-        children: [
-            {
-                title: "All Transactions",
-                url: "/wallet/overview",
-                icon: List,
-            },
-            {
-                title: "Deposits",
-                url: "/wallet/deposits",
-                icon: CreditCard,
-            },
-            {
-                title: "Withdrawals",
-                url: "//wallet/withdrawals",
-                icon: CreditCard,
-            }
-        ]
-    },
-    {
-        type: "group",
-        title: "Settings",
-        icon: Settings,
-        children: [
-            {
-                title: "Account",
-                url: "/settings/account",
-                icon: User,
-            },
-            {
-                title: "Security",
-                url: "/settings/security",
-                icon: Shield,
-            },
-            {
-                title: "Preferences",
-                url: "/settings/preferences",
-                icon: Sliders,
-            },
-        ],
-    },
-
-    {
-        type: "link",
-        title: "Support",
-        url: "/support",
-        icon: LifeBuoy
-    }
+// Main routes - primary navigation items
+export const mainRoutes: SideBarRoute[] = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: Home,
+    section: "main",
+  },
+  {
+    title: "Portfolio",
+    url: "/portfolio",
+    icon: PieChart,
+    section: "main",
+  },
+  {
+    title: "Investments",
+    url: "/investments",
+    icon: LineChart,
+    section: "main",
+  },
+  {
+    title: "Transactions",
+    url: "/transactions",
+    icon: CreditCard,
+    section: "main",
+  },
 ]
 
-export type SideBarChildEntry = {
-    title: string;
-    url: string;
-    icon: React.ComponentType;
-}
+// Other routes - secondary navigation items
+export const otherRoutes: SideBarRoute[] = [
+  {
+    title: "Markets",
+    url: "/markets",
+    icon: BarChart3,
+    section: "other",
+  },
+  {
+    title: "Accounts",
+    url: "/accounts",
+    icon: Users,
+    section: "other",
+  },
+  {
+    title: "Support",
+    url: "/support",
+    icon: LifeBuoy,
+    section: "other",
+  },
+]
+
+// Combined routes for components that need all routes
+export const allRoutes = [...mainRoutes, ...otherRoutes]

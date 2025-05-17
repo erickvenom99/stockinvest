@@ -1,3 +1,4 @@
+// api/transactions/route.ts
 import { NextResponse, NextRequest } from 'next/server'
 import connectDB from '@/lib/db'
 import Transaction from '@/lib/models/transaction'
