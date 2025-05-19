@@ -1,108 +1,85 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { ArrowUpRight, Clock, CheckCircle, AlertCircle, Info, Plus } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import SendModal from "@/components/SendModal"
-import { type Plan, PLANS } from "@/types/plan"
-
-interface SendModalState {
-  currency: "BTC" | "USDT"
-  selectedPlan: Plan | null
-  verificationStatus: "idle" | "pending" | "verified" | "failed"
-  verificationStarted: boolean
-  isCopied: boolean
-}
-
-// Mock active investments
-const activeInvestments = [
-  {
-    id: "inv1",
-    plan: "Silver",
-    amount: 1000,
-    currency: "USDT",
-    startDate: "2025-04-15T10:00:00Z",
-    endDate: "2025-07-15T10:00:00Z",
-    status: "active",
-    returns: 80,
-    progress: 33,
-  },
-  {
-    id: "inv2",
-    plan: "Gold",
-    amount: 0.05,
-    currency: "BTC",
-    startDate: "2025-05-01T14:30:00Z",
-    endDate: "2025-08-01T14:30:00Z",
-    status: "active",
-    returns: 210,
-    progress: 12,
-  },
-]
-
-// Mock completed investments
-const completedInvestments = [
-  {
-    id: "inv3",
-    plan: "Bronze",
-    amount: 500,
-    currency: "USDT",
-    startDate: "2025-01-10T09:15:00Z",
-    endDate: "2025-04-10T09:15:00Z",
-    status: "completed",
-    returns: 37.5,
-    progress: 100,
-  },
-  {
-    id: "inv4",
-    plan: "Silver",
-    amount: 0.02,
-    currency: "BTC",
-    startDate: "2025-02-05T11:45:00Z",
-    endDate: "2025-05-05T11:45:00Z",
-    status: "completed",
-    returns: 0.0016,
-    progress: 100,
-  },
-]
+import { PLANS } from "@/types/plan"
+import { fetchPortfolioData } from "@/lib/api/portfolio"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useTransaction } from "@/contexts/transaction/transaction-context"
 
 export default function InvestmentsPage() {
   const [showInvestModal, setShowInvestModal] = useState(false)
-  const [sendModalState, setSendModalState] = useState<SendModalState>({
-    currency: "BTC",
-    selectedPlan: null,
-    verificationStatus: "idle",
-    verificationStarted: false,
-    isCopied: false,
-  })
+  const [loading, setLoading] = useState(true)
+  const [activeInvestments, setActiveInvestments] = useState<any[]>([])
+  const [completedInvestments, setCompletedInvestments] = useState<any[]>([])
+  const { state, setSelectedPlan } = useTransaction()
 
-  const resetSendModalState = () => {
-    setSendModalState((prev) => ({
-      ...prev,
-      currency: "BTC",
-      selectedPlan: null,
-      isCopied: false,
-    }))
-  }
+  useEffect(() => {
+    const loadPortfolioData = async () => {
+      setLoading(true)
+      try {
+        const data = await fetchPortfolioData()
+        if (data) {
+          setActiveInvestments(
+            data.activeInvestments.map((inv) => ({
+              id: inv.id,
+              plan: inv.planName,
+              amount: inv.amount,
+              currency: inv.currency,
+              startDate: inv.startDate,
+              endDate: inv.endDate,
+              status: inv.status,
+              returns: inv.targetValue - inv.initialValue,
+              progress: calculateProgress(new Date(inv.startDate), new Date(inv.endDate)),
+              currentValue: inv.currentValue,
+              targetValue: inv.targetValue,
+            })),
+          )
+          setCompletedInvestments(
+            data.completedInvestments.map((inv) => ({
+              id: inv.id,
+              plan: inv.planName,
+              amount: inv.amount,
+              currency: inv.currency,
+              startDate: inv.startDate,
+              endDate: inv.endDate,
+              status: inv.status,
+              returns: inv.targetValue - inv.initialValue,
+              progress: 100,
+              currentValue: inv.currentValue,
+              targetValue: inv.targetValue,
+            })),
+          )
+        }
+      } catch (error) {
+        console.error("Failed to load portfolio data:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const sendModalProps = {
-    currency: sendModalState.currency,
-    selectedPlan: sendModalState.selectedPlan,
-    verificationStatus: sendModalState.verificationStatus,
-    verificationStarted: sendModalState.verificationStarted,
-    isCopied: sendModalState.isCopied,
-    setCurrency: (currency: "BTC" | "USDT") => setSendModalState((prev) => ({ ...prev, currency })),
-    setSelectedPlan: (plan: Plan | null) => setSendModalState((prev) => ({ ...prev, selectedPlan: plan })),
-    setVerificationStatus: (status: "idle" | "pending" | "verified" | "failed") =>
-      setSendModalState((prev) => ({ ...prev, verificationStatus: status })),
-    setVerificationStarted: (started: boolean) =>
-      setSendModalState((prev) => ({ ...prev, verificationStarted: started })),
-    setIsCopied: (copied: boolean) => setSendModalState((prev) => ({ ...prev, isCopied: copied })),
+    loadPortfolioData()
+    // Refresh data every minute
+    const interval = setInterval(loadPortfolioData, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const calculateProgress = (startDate: Date, endDate: Date) => {
+    const now = new Date()
+    const total = endDate.getTime() - startDate.getTime()
+    const elapsed = now.getTime() - startDate.getTime()
+
+    if (elapsed <= 0) return 0
+    if (elapsed >= total) return 100
+
+    return Math.round((elapsed / total) * 100)
   }
 
   const formatDate = (dateString: string) => {
@@ -118,7 +95,39 @@ export default function InvestmentsPage() {
     const now = new Date()
     const diffTime = end.getTime() - now.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
+    return diffDays > 0 ? diffDays : 0
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-48 w-full" />
+          ))}
+        </div>
+
+        <Tabs defaultValue="active" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="active">Active Investments</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+          </TabsList>
+          <TabsContent value="active" className="space-y-4">
+            {[...Array(2)].map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </TabsContent>
+        </Tabs>
+      </div>
+    )
   }
 
   return (
@@ -168,7 +177,7 @@ export default function InvestmentsPage() {
               <Button
                 className="w-full"
                 onClick={() => {
-                  setSendModalState((prev) => ({ ...prev, selectedPlan: plan }))
+                  setSelectedPlan(plan)
                   setShowInvestModal(true)
                 }}
               >
@@ -207,9 +216,13 @@ export default function InvestmentsPage() {
                         {investment.amount} {investment.currency} ($
                         {(investment.amount * (investment.currency === "BTC" ? 30000 : 1)).toLocaleString()})
                       </div>
+                      <div className="text-sm">
+                        <span className="font-medium">Current Value: </span>$
+                        {investment.currentValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </div>
                       <div className="text-sm text-green-600">
-                        <span className="font-medium">Expected Return: </span>
-                        {investment.returns} {investment.currency === "BTC" ? "USD" : "USD"}
+                        <span className="font-medium">Expected Return: </span>$
+                        {investment.returns.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </div>
                     </div>
                     <div className="flex flex-col justify-between">
@@ -266,8 +279,8 @@ export default function InvestmentsPage() {
                         {(investment.amount * (investment.currency === "BTC" ? 30000 : 1)).toLocaleString()})
                       </div>
                       <div className="text-sm text-green-600">
-                        <span className="font-medium">Total Return: </span>
-                        {investment.returns} {investment.currency === "BTC" ? "USD" : "USD"}
+                        <span className="font-medium">Total Return: </span>$
+                        {investment.returns.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </div>
                     </div>
                     <div className="flex flex-col justify-between">
@@ -299,24 +312,16 @@ export default function InvestmentsPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog
-        open={showInvestModal}
-        onOpenChange={(open) => {
-          setShowInvestModal(open)
-          if (!open) {
-            resetSendModalState()
-          }
-        }}
-      >
+      <Dialog open={showInvestModal} onOpenChange={(open) => setShowInvestModal(open)}>
         <DialogContent className="sm:max-w-[425px] border-0 rounded-xl shadow-xl bg-background sm:top-[50%] sm:translate-y-[-50%] bottom-0 top-auto h-[95vh] max-h-[100dvh] flex flex-col overflow-hidden">
           <div className="absolute inset-0 rounded-xl border-2 border-primary/10 backdrop-blur-sm" />
           <div className="relative z-10 h-full flex flex-col">
             <DialogHeader className="shrink-0 px-6 pt-6 pb-3">
-              <h3 className="text-lg font-semibold">New Investment</h3>
+              <DialogTitle className="text-lg font-semibold">New Investment</DialogTitle>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto px-6 pb-6">
-              <SendModal {...sendModalProps} />
+              <SendModal />
             </div>
           </div>
         </DialogContent>

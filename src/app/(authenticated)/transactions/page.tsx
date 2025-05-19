@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -30,12 +30,15 @@ export default function TransactionsPage() {
     from: undefined,
     to: undefined,
   })
+  const [activeTab, setActiveTab] = useState("all")
 
   useEffect(() => {
     const loadTransactions = async () => {
       setLoading(true)
       try {
-        const data = await fetchTransactions()
+        // Pass the type filter based on the active tab
+        const type = activeTab === "deposits" ? "deposit" : activeTab === "withdrawals" ? "withdrawal" : undefined
+        const data = await fetchTransactions(type)
         setTransactions(data)
       } catch (error) {
         console.error("Failed to load transactions:", error)
@@ -45,7 +48,7 @@ export default function TransactionsPage() {
     }
 
     loadTransactions()
-  }, [])
+  }, [activeTab])
 
   const filteredTransactions = transactions.filter((tx) => {
     // Apply type filter
@@ -152,8 +155,8 @@ export default function TransactionsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="send">Sent</SelectItem>
-                  <SelectItem value="receive">Received</SelectItem>
+                  <SelectItem value="deposit">Deposits</SelectItem>
+                  <SelectItem value="withdrawal">Withdrawals</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -202,116 +205,126 @@ export default function TransactionsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="all" className="w-full">
+          <Tabs defaultValue="all" className="w-full" value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-3 mb-4">
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="deposits">Deposits</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             </TabsList>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="text-left py-3 px-4 font-medium">Type</th>
-                    <th className="text-left py-3 px-4 font-medium">Date</th>
-                    <th className="text-left py-3 px-4 font-medium">Description</th>
-                    <th className="text-right py-3 px-4 font-medium">Amount</th>
-                    <th className="text-center py-3 px-4 font-medium">Status</th>
-                    <th className="text-right py-3 px-4 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTransactions.length > 0 ? (
-                    filteredTransactions.map((tx) => (
-                      <tr key={tx.id} className="border-b hover:bg-muted/50">
-                        <td className="py-4 px-4">
-                          <div className="flex items-center">
-                            <div
-                              className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center mr-3",
-                                tx.type === "receive" ? "bg-green-100" : "bg-red-100",
-                              )}
-                            >
-                              {tx.type === "receive" ? (
-                                <ArrowDownRight className="w-4 h-4 text-green-600" />
-                              ) : (
-                                <ArrowUpRight className="w-4 h-4 text-red-600" />
-                              )}
-                            </div>
-                            <span className="capitalize">{tx.type}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-sm">{formatDate(tx.date)}</td>
-                        <td className="py-4 px-4">
-                          {tx.description || (tx.type === "receive" ? "Deposit" : "Withdrawal")}
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Image
-                              src={currencyImages[tx.currency as keyof typeof currencyImages] || "/placeholder.svg"}
-                              alt={tx.currency}
-                              width={16}
-                              height={16}
-                              className="rounded-full"
-                              unoptimized
-                            />
-                            <span className="font-medium">
-                              {tx.type === "receive" ? "+" : "-"}
-                              {tx.amount} {tx.currency}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex justify-center">
-                            <span
-                              className={cn(
-                                "px-2 py-1 rounded-full text-xs",
-                                tx.status === "completed"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-yellow-100 text-yellow-700",
-                              )}
-                            >
-                              {tx.status === "completed" ? "Completed" : "Pending"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => {
-                              if (tx.txHash) {
-                                const baseUrl =
-                                  tx.currency === "BTC" ? "https://blockstream.info/tx/" : "https://etherscan.io/tx/"
-                                window.open(`${baseUrl}${tx.txHash}`, "_blank")
-                              }
-                            }}
-                            disabled={!tx.txHash}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                        <div className="flex flex-col items-center justify-center">
-                          <Search className="h-8 w-8 mb-2" />
-                          <p>No transactions found</p>
-                          <p className="text-xs mt-1">Try adjusting your filters</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <TabsContent value="all" className="mt-0">
+              {renderTransactionTable(filteredTransactions)}
+            </TabsContent>
+            <TabsContent value="deposits" className="mt-0">
+              {renderTransactionTable(filteredTransactions)}
+            </TabsContent>
+            <TabsContent value="withdrawals" className="mt-0">
+              {renderTransactionTable(filteredTransactions)}
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
     </div>
   )
+
+  function renderTransactionTable(transactions: Transaction[]) {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b text-xs text-muted-foreground">
+              <th className="text-left py-3 px-4 font-medium">Type</th>
+              <th className="text-left py-3 px-4 font-medium">Date</th>
+              <th className="text-left py-3 px-4 font-medium">Description</th>
+              <th className="text-right py-3 px-4 font-medium">Amount</th>
+              <th className="text-center py-3 px-4 font-medium">Status</th>
+              <th className="text-right py-3 px-4 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.length > 0 ? (
+              transactions.map((tx) => (
+                <tr key={tx.id} className="border-b hover:bg-muted/50">
+                  <td className="py-4 px-4">
+                    <div className="flex items-center">
+                      <div
+                        className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center mr-3",
+                          tx.type === "deposit" ? "bg-green-100" : "bg-red-100",
+                        )}
+                      >
+                        {tx.type === "deposit" ? (
+                          <ArrowDownRight className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <ArrowUpRight className="w-4 h-4 text-red-600" />
+                        )}
+                      </div>
+                      <span className="capitalize">{tx.type}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-sm">{formatDate(tx.date)}</td>
+                  <td className="py-4 px-4">{tx.description || (tx.type === "deposit" ? "Deposit" : "Withdrawal")}</td>
+                  <td className="py-4 px-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Image
+                        src={currencyImages[tx.currency as keyof typeof currencyImages] || "/placeholder.svg"}
+                        alt={tx.currency}
+                        width={16}
+                        height={16}
+                        className="rounded-full"
+                        unoptimized
+                      />
+                      <span className="font-medium">
+                        {tx.type === "deposit" ? "+" : "-"}
+                        {tx.amount} {tx.currency}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex justify-center">
+                      <span
+                        className={cn(
+                          "px-2 py-1 rounded-full text-xs",
+                          tx.status === "completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700",
+                        )}
+                      >
+                        {tx.status === "completed" ? "Completed" : "Pending"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        if (tx.txHash) {
+                          const baseUrl =
+                            tx.currency === "BTC" ? "https://blockstream.info/tx/" : "https://etherscan.io/tx/"
+                          window.open(`${baseUrl}${tx.txHash}`, "_blank")
+                        }
+                      }}
+                      disabled={!tx.txHash}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center">
+                    <Search className="h-8 w-8 mb-2" />
+                    <p>No transactions found</p>
+                    <p className="text-xs mt-1">Try adjusting your filters</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 }

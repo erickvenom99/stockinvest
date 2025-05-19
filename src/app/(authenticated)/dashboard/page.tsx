@@ -8,19 +8,13 @@ import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import QuickActionMenu from "@/components/quick-action-menu"
-
-interface CryptoData {
-  id: string
-  name: string
-  current_price: number
-  price_change_percentage_24h: number
-  symbol: string
-  image?: string
-  price_change_24h: number
-}
+import { fetchMarketData, type CryptoData } from "@/lib/api/market"
+import { fetchPortfolioData, type PortfolioSummary } from "@/lib/api/portfolio"
+import PortfolioChart from "@/components/portfolio-chart"
 
 export default function DashboardPage() {
   const [marketData, setMarketData] = useState<CryptoData[]>([])
+  const [portfolioData, setPortfolioData] = useState<PortfolioSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,15 +24,11 @@ export default function DashboardPage() {
 
     const fetchData = async () => {
       try {
-        const response = await fetch("/api/market-data", {
-          signal: controller.signal,
-        })
+        const [market, portfolio] = await Promise.all([fetchMarketData(), fetchPortfolioData()])
 
-        if (!response.ok) throw new Error("Failed to fetch")
-
-        const data = await response.json()
         if (isMounted) {
-          setMarketData(data)
+          setMarketData(market || [])
+          setPortfolioData(portfolio)
           setError(null)
         }
       } catch (error) {
@@ -52,13 +42,43 @@ export default function DashboardPage() {
     }
 
     fetchData()
-    const interval = setInterval(fetchData, 5000)
+    const interval = setInterval(fetchData, 30000) // Fetch every 30 seconds
     return () => {
       isMounted = false
       clearInterval(interval)
       controller.abort()
     }
   }, [])
+
+  // Calculate 24h change
+  const calculateChange = () => {
+    if (!portfolioData || !portfolioData.portfolioHistory || portfolioData.portfolioHistory.length < 2) {
+      return { change24h: 0, changeValue: 0 }
+    }
+
+    const history = portfolioData.portfolioHistory
+    const currentValue = history[history.length - 1].totalValue
+
+    // Find value from 24h ago or the oldest available value if history is shorter
+    let previousValue = currentValue
+    const oneDayAgo = new Date()
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1)
+
+    for (let i = history.length - 2; i >= 0; i--) {
+      const entryDate = new Date(history[i].date)
+      if (entryDate <= oneDayAgo) {
+        previousValue = history[i].totalValue
+        break
+      }
+    }
+
+    const changeValue = currentValue - previousValue
+    const change24h = previousValue > 0 ? (changeValue / previousValue) * 100 : 0
+
+    return { change24h, changeValue }
+  }
+
+  const { change24h, changeValue } = calculateChange()
 
   if (loading) {
     return (
@@ -73,32 +93,40 @@ export default function DashboardPage() {
       </div>
     )
   }
+
   return (
     <div className="space-y-6">
       {error && <div className="p-4 bg-yellow-100 border boerder-yellow-200 rounded-lg">⚠️ {error}</div>}
       {/* Section 1: Portfolio Overview */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
+          {/* <CardHeader className="flex flex-row items-center justify-between">
             <div className="space-y-1">
               <h3 className="text-lg font-semibold">Portfolio Value</h3>
-              <div className="text-3xl font-bold">$24,532.80</div>
-              <div className="flex items-center text-green-500">
-                <ArrowUpRight className="w-4 h-4 mr-1" />
-                +2.4% (24h)
+              <div className="text-3xl font-bold">
+                ${(portfolioData?.totalValue || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </div>
+              <div className={cn("flex items-center", change24h >= 0 ? "text-green-500" : "text-red-500")}>
+                {change24h >= 0 ? <ArrowUpRight className="w-4 h-4 mr-1" /> : "↓"}
+                {Math.abs(change24h).toFixed(2)}% (24h)
               </div>
             </div>
             <Wallet className="w-8 h-8 text-primary" />
-          </CardHeader>
+          </CardHeader> */}
           <CardContent>
-            {/* Placeholder for chart */}
-            <div className="h-48 bg-muted rounded-lg" />
+            <PortfolioChart
+              portfolioHistory={portfolioData?.portfolioHistory || []}
+              totalValue={portfolioData?.totalValue || 0}
+              change24h={change24h}
+              changeValue={changeValue}
+              isLoading={loading}
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold"> Asset Allocation</h3>
+            <h3 className="text-lg font-semibold">Asset Allocation</h3>
           </CardHeader>
           <CardContent className="space-y-4">
             {marketData
@@ -167,7 +195,7 @@ export default function DashboardPage() {
               </span>
               LIVE PRICES
             </div>
-            <span className="text-xs text-muted-foreground">Updated every 5 seconds</span>
+            <span className="text-xs text-muted-foreground">Updated every 30 seconds</span>
           </div>
         </CardHeader>
         <CardContent>

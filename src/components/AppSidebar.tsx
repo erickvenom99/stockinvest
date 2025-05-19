@@ -1,5 +1,5 @@
 "use client"
-import type React from "react"
+import type { ReactElement } from "react"
 import Link from "next/link"
 import {
   Sidebar,
@@ -15,12 +15,12 @@ import {
 } from "@/components/ui/sidebar"
 import { useUser } from "@/contexts/user/user-context"
 import { cn } from "@/lib/utils"
-import { mainRoutes, otherRoutes } from "./ui/sidebar-data"
+import { type SideBarRoute, mainRoutes, otherRoutes } from "./ui/sidebar-data"
 
 type AppSidebarProps = {
   collapsed: boolean
-  toggleSidebar: () => void
   className?: string
+  toggleSidebar?: () => void
 }
 
 type UserProfileProps = {
@@ -47,8 +47,8 @@ const UserProfile = ({ collapsed, user }: UserProfileProps) => {
   )
 }
 
-const MenuItemContent = ({ entry, collapsed }: { entry: any; collapsed: boolean }) => {
-  const Icon = entry.icon as React.ElementType<{ className?: string }>
+const MenuItemContent = ({ entry, collapsed }: { entry: SideBarRoute; collapsed: boolean }): ReactElement => {
+  const Icon = entry.icon
 
   return (
     <>
@@ -58,10 +58,10 @@ const MenuItemContent = ({ entry, collapsed }: { entry: any; collapsed: boolean 
   )
 }
 
-export function AppSidebar({ collapsed, toggleSidebar, className }: AppSidebarProps) {
+export function AppSidebar({ collapsed, className, toggleSidebar }: AppSidebarProps) {
   const { user, loading, error } = useUser()
 
-  const renderRoutes = (routes: any[]) => {
+  const renderRoutes = (routes: SideBarRoute[]) => {
     return routes.map((route) => (
       <SidebarMenuItem key={route.title} className="p-2">
         <SidebarMenuButton asChild>

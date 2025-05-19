@@ -3,7 +3,7 @@ import { toast } from "sonner"
 
 export interface Transaction {
   id: string
-  type: "send" | "receive"
+  type: "deposit" | "withdrawal"
   amount: number
   currency: string
   date: string
@@ -17,6 +17,7 @@ export interface CreateTransactionParams {
   amount: number
   currency: "BTC" | "USDT"
   toAddress: string
+  type?: "deposit" | "withdrawal"
 }
 
 export async function createTransaction(params: CreateTransactionParams): Promise<{ _id: string } | null> {
@@ -43,12 +44,12 @@ export async function createTransaction(params: CreateTransactionParams): Promis
 }
 
 export async function verifyTransaction(
-  address: string,
+  id: string,
   currency: "BTC" | "USDT",
   minAmount: number,
 ): Promise<{ status: "pending" | "confirmed" | "failed"; txHash?: string }> {
   try {
-    const response = await fetch(`/api/transactions/${address}/verify?currency=${currency}&minAmount=${minAmount}`)
+    const response = await fetch(`/api/transactions/${id}/verify?currency=${currency}&minAmount=${minAmount}`)
 
     if (!response.ok) {
       const error = await response.json()
@@ -62,9 +63,10 @@ export async function verifyTransaction(
   }
 }
 
-export async function fetchTransactions(): Promise<Transaction[]> {
+export async function fetchTransactions(type?: "deposit" | "withdrawal"): Promise<Transaction[]> {
   try {
-    const response = await fetch("/api/transactions", {
+    const url = type ? `/api/transactions?type=${type}` : "/api/transactions"
+    const response = await fetch(url, {
       next: { revalidate: 60 }, // Revalidate every minute at most
     })
 

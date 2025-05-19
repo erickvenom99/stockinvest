@@ -1,0 +1,84 @@
+import { NextResponse, type NextRequest } from "next/server"
+import connectDB from "@/lib/db"
+import Transaction from "@/lib/models/transaction"
+import Account from "@/lib/models/account"
+import { verifyToken } from "@/lib/auth"
+import { findIncomingTransactionToAddress } from "@/lib/blockchain"
+import mongoose from "mongoose"
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  await connectDB()
+
+  // Authenticate
+  const cookie = req.cookies.get("authToken")?.value
+  if (!cookie) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  let payload
+  try {
+    payload = verifyToken(cookie)
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { id } = params
+  const { searchParams } = new URL(req.url)
+  const currency = searchParams.get("currency") as "BTC" | "USDT"
+  const minAmount = Number.parseFloat(searchParams.get("minAmount") || "0")
+
+  if (!id || !currency) {
+    return NextResponse.json({ error: "Missing parameters" }, { status: 400 })
+  }
+
+  try {
+    // Find the transaction
+    const transaction = await Transaction.findById(id)
+    if (!transaction) {
+      return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
+    }
+
+    // Check if transaction is already confirmed
+    if (transaction.status === "completed") {
+      return NextResponse.json({ status: "confirmed", txHash: transaction.txHash })
+    }
+
+    // Verify the transaction on the blockchain
+    const blockchainTx = await findIncomingTransactionToAddress(transaction.address, minAmount, currency)
+
+    if (blockchainTx) {
+      // Update transaction status
+      transaction.status = "completed"
+      transaction.txHash = blockchainTx.txHash
+      transaction.amount = blockchainTx.amount
+      transaction.completedAt = new Date(blockchainTx.timestamp)
+      await transaction.save()
+
+      // Update user's account balance
+      const account = await Account.findOneAndUpdate(
+        { user: new mongoose.Types.ObjectId(payload.id) },
+        {
+          $inc: { [`balances.${currency}`]: blockchainTx.amount },
+          $push: {
+            portfolioHistory: {
+              date: new Date(),
+              totalValue: blockchainTx.amount * (currency === "BTC" ? 30000 : 1), // Simple conversion
+              btcValue: currency === "BTC" ? blockchainTx.amount * 30000 : 0,
+              usdtValue: currency === "USDT" ? blockchainTx.amount : 0,
+              usdValue: 0,
+              investmentsValue: 0,
+            },
+          },
+        },
+        { new: true, upsert: true },
+      )
+
+      return NextResponse.json({ status: "confirmed", txHash: blockchainTx.txHash })
+    }
+
+    return NextResponse.json({ status: "pending" })
+  } catch (error) {
+    console.error("Error verifying transaction:", error)
+    return NextResponse.json({ error: "Failed to verify transaction" }, { status: 500 })
+  }
+}

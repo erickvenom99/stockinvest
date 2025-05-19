@@ -1,139 +1,23 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Copy, CheckCircle2, AlertCircle, ChevronDown } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import Image from "next/image"
 import * as Select from "@radix-ui/react-select"
-import { type Plan, PLANS } from "@/types/plan"
+import { PLANS } from "@/types/plan"
 import { AnimatePresence, motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { useUser } from "@/contexts/user/user-context"
-import { createTransaction, verifyTransaction } from "@/lib/api/transactions"
-import { toast } from "sonner"
+import { useTransaction, walletConfig } from "@/contexts/transaction/transaction-context"
 
-interface SendModalProps {
-  currency: "BTC" | "USDT"
-  selectedPlan: Plan | null
-  verificationStatus: "idle" | "pending" | "verified" | "failed"
-  verificationStarted: boolean
-  isCopied: boolean
-  setCurrency: (currency: "BTC" | "USDT") => void
-  setSelectedPlan: (plan: Plan | null) => void
-  setVerificationStatus: (status: "idle" | "pending" | "verified" | "failed") => void
-  setVerificationStarted: (started: boolean) => void
-  setIsCopied: (copied: boolean) => void
-}
-
-// Wallet configuration with fallback addresses
-const walletConfig = {
-  BTC: {
-    address: process.env.NEXT_PUBLIC_BTC_ADDRESS || "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-    network: "Bitcoin Network",
-    image: "https://assets.coingecko.com/coins/images/1/large/bitcoin.png",
-  },
-  USDT: {
-    address: process.env.NEXT_PUBLIC_USDT_ADDRESS || "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-    network: "ERC20 Network",
-    image: "https://assets.coingecko.com/coins/images/325/large/Tether.png",
-  },
-}
-
-export default function SendModal({
-  currency,
-  selectedPlan,
-  verificationStatus,
-  verificationStarted,
-  isCopied,
-  setCurrency,
-  setSelectedPlan,
-  setVerificationStatus,
-  setVerificationStarted,
-  setIsCopied,
-}: SendModalProps) {
+export default function SendModal() {
   const { user, loading } = useUser()
   const router = useRouter()
+  const { state, setCurrency, setSelectedPlan, handleCreateTransaction, handleCopyAddress, resetVerification } =
+    useTransaction()
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const [transactionId, setTransactionId] = useState<string | null>(null)
-
-  const handleCreateTransaction = async () => {
-    if (!loading && !user) {
-      router.push("/auth/login")
-      return
-    }
-    if (!selectedPlan) return
-
-    setVerificationStarted(true)
-    setVerificationStatus("pending")
-
-    // Create the transaction record
-    const result = await createTransaction({
-      amount: selectedPlan.minAmount,
-      currency,
-      toAddress: walletConfig[currency].address,
-    })
-
-    if (!result) {
-      setVerificationStatus("failed")
-      return
-    }
-
-    setTransactionId(result._id)
-
-    // Set up the 30-minute timeout
-    timerRef.current = setTimeout(
-      () => {
-        if (intervalRef.current) clearInterval(intervalRef.current)
-        setVerificationStatus("failed")
-      },
-      30 * 60 * 1000,
-    ) // 30 minutes
-
-    // Begin polling for verification
-    intervalRef.current = setInterval(async () => {
-      if (!result._id) return
-
-      const verificationResult = await verifyTransaction(result._id, currency, selectedPlan.minAmount)
-
-      if (verificationResult.status === "confirmed") {
-        if (timerRef.current) clearTimeout(timerRef.current)
-        if (intervalRef.current) clearInterval(intervalRef.current)
-
-        setVerificationStatus("verified")
-        toast.success("Payment Verified",{
-          description: "Your transaction has been confirmed on the blockchain",
-        })
-
-        // Reset after a pause
-        setTimeout(() => {
-          setSelectedPlan(null)
-          setVerificationStatus("idle")
-          setVerificationStarted(false)
-        }, 5000)
-      }
-    }, 15000) // Check every 15 seconds
-  }
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [])
-
-  const handleCopyAddress = async () => {
-    try {
-      await navigator.clipboard.writeText(walletConfig[currency].address)
-      setIsCopied(true)
-      setTimeout(() => setIsCopied(false), 2000)
-    } catch (error) {
-      console.error("Failed to copy:", error)
-    }
-  }
+  const { currency, selectedPlan, verificationStatus, isSubmitting, isCopied } = state
 
   return (
     <div className="space-y-6">
@@ -197,6 +81,7 @@ export default function SendModal({
             variant={currency === "BTC" ? "default" : "secondary"}
             onClick={() => setCurrency("BTC")}
             className="h-12 flex items-center justify-center gap-2"
+            type="button"
           >
             <Image
               src={walletConfig.BTC.image || "/placeholder.svg"}
@@ -212,6 +97,7 @@ export default function SendModal({
             variant={currency === "USDT" ? "default" : "secondary"}
             onClick={() => setCurrency("USDT")}
             className="h-12 flex items-center justify-center gap-2"
+            type="button"
           >
             <Image
               src={walletConfig.USDT.image || "/placeholder.svg"}
@@ -268,7 +154,7 @@ export default function SendModal({
                   readOnly
                   className="flex-1 p-2 bg-background rounded-lg border font-mono text-sm"
                 />
-                <Button onClick={handleCopyAddress} variant="outline" size="sm" disabled={isCopied}>
+                <Button onClick={handleCopyAddress} variant="outline" size="sm" disabled={isCopied} type="button">
                   {isCopied ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                 </Button>
               </div>
@@ -278,19 +164,35 @@ export default function SendModal({
             <div className="space-y-4 sticky bottom-0 bg-background pt-4 border-t">
               <Button
                 onClick={handleCreateTransaction}
+                type="button"
                 className="w-full"
-                disabled={!selectedPlan || verificationStatus !== "idle"}
+                disabled={!selectedPlan || verificationStatus !== "idle" || isSubmitting}
               >
-                {selectedPlan ? `Verify ${selectedPlan.name} Payment` : "Select a Plan to Continue"}
+                {isSubmitting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                    <span>Processing...</span>
+                  </div>
+                ) : selectedPlan ? (
+                  `Verify ${selectedPlan.name} Payment`
+                ) : (
+                  "Select a Plan to Continue"
+                )}
               </Button>
 
               {/* Verification Status Indicators */}
               {verificationStatus !== "idle" && (
                 <div className="text-center space-y-2">
                   {verificationStatus === "pending" && (
-                    <div className="flex items-center justify-center gap-2 text-blue-500">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-                      <span>Verifying transaction...</span>
+                    <div className="flex flex-col items-center justify-center gap-2 text-blue-500">
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                        <span>Verifying transaction...</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        You can close this window or navigate away. We&apos;ll continue to verify your transaction in
+                        the background and notify you when it&apos;s confirmed.
+                      </p>
                     </div>
                   )}
                   {verificationStatus === "verified" && (
@@ -299,7 +201,8 @@ export default function SendModal({
                         <CheckCircle2 className="w-5 h-5" />
                         <span>Payment verified!</span>
                       </div>
-                      <Button size="sm" onClick={() => setVerificationStatus("idle")} className="mt-2">
+                      <p className="text-sm">Your investment has been created successfully.</p>
+                      <Button size="sm" onClick={resetVerification} className="mt-2" type="button">
                         New Transaction
                       </Button>
                     </div>
@@ -310,14 +213,7 @@ export default function SendModal({
                         <AlertCircle className="w-5 h-5" />
                         <span>Verification failed. Please try again.</span>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setVerificationStatus("idle")
-                          setVerificationStarted(false)
-                        }}
-                        className="mt-2"
-                      >
+                      <Button size="sm" onClick={resetVerification} className="mt-2" type="button">
                         Try Again
                       </Button>
                     </div>

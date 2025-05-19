@@ -1,68 +1,22 @@
 "use client"
 
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowUpRight, ArrowDownRight, Clock, Plus, BarChart3, Wallet, RefreshCw, CreditCard } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import SendModal from "@/components/SendModal"
 import ReceiveModal from "@/components/receive-modal"
 import TransactionHistoryModal from "@/components/transaction-history-modal"
-import type { Plan } from "@/types/plan"
 import { useRouter } from "next/navigation"
+import { useTransaction } from "@/contexts/transaction/transaction-context"
 
 interface QuickActionMenuProps {
   className?: string
 }
 
-interface SendModalState {
-  currency: "BTC" | "USDT"
-  selectedPlan: Plan | null
-  verificationStatus: "idle" | "pending" | "verified" | "failed"
-  verificationStarted: boolean
-  isCopied: boolean
-}
-
 export default function QuickActionMenu({ className }: QuickActionMenuProps) {
   const router = useRouter()
-  const [activeAction, setActiveAction] = useState<"send" | "receive" | "history" | null>(null)
-  const [showActionModal, setShowActionModal] = useState(false)
-  const [sendModalState, setSendModalState] = useState<SendModalState>({
-    currency: "BTC",
-    selectedPlan: null,
-    verificationStatus: "idle",
-    verificationStarted: false,
-    isCopied: false,
-  })
-
-  const resetSendModalState = () => {
-    setSendModalState((prev) => ({
-      ...prev,
-      currency: "BTC",
-      selectedPlan: null,
-      isCopied: false,
-    }))
-  }
-
-  const sendModalProps = {
-    currency: sendModalState.currency,
-    selectedPlan: sendModalState.selectedPlan,
-    verificationStatus: sendModalState.verificationStatus,
-    verificationStarted: sendModalState.verificationStarted,
-    isCopied: sendModalState.isCopied,
-    setCurrency: (currency: "BTC" | "USDT") => setSendModalState((prev) => ({ ...prev, currency })),
-    setSelectedPlan: (plan: Plan | null) => setSendModalState((prev) => ({ ...prev, selectedPlan: plan })),
-    setVerificationStatus: (status: "idle" | "pending" | "verified" | "failed") =>
-      setSendModalState((prev) => ({ ...prev, verificationStatus: status })),
-    setVerificationStarted: (started: boolean) =>
-      setSendModalState((prev) => ({ ...prev, verificationStarted: started })),
-    setIsCopied: (copied: boolean) => setSendModalState((prev) => ({ ...prev, isCopied: copied })),
-  }
-
-  const handleQuickAction = (action: "send" | "receive" | "history") => {
-    setActiveAction(action)
-    setShowActionModal(true)
-  }
+  const { state, handleQuickAction, closeModal } = useTransaction()
 
   const handleNavigate = (path: string) => {
     router.push(path)
@@ -72,7 +26,7 @@ export default function QuickActionMenu({ className }: QuickActionMenuProps) {
     <>
       <div className="grid gap-4 md:grid-cols-3">
         <Button
-          variant={activeAction === "send" ? "default" : "secondary"}
+          variant={state.activeAction === "send" ? "default" : "secondary"}
           className="h-24 flex flex-col items-center justify-center space-y-2 transition-all cursor-pointer hover:shadow-md"
           onClick={() => handleQuickAction("send")}
         >
@@ -80,7 +34,7 @@ export default function QuickActionMenu({ className }: QuickActionMenuProps) {
           <span>Send</span>
         </Button>
         <Button
-          variant={activeAction === "receive" ? "default" : "secondary"}
+          variant={state.activeAction === "receive" ? "default" : "secondary"}
           className="h-24 flex flex-col items-center justify-center space-y-2 transition-all"
           onClick={() => handleQuickAction("receive")}
         >
@@ -122,27 +76,18 @@ export default function QuickActionMenu({ className }: QuickActionMenuProps) {
         </DropdownMenu>
       </div>
 
-      <Dialog
-        open={showActionModal}
-        onOpenChange={(open) => {
-          setShowActionModal(open)
-          if (!open) {
-            setActiveAction(null)
-            resetSendModalState()
-          }
-        }}
-      >
+      <Dialog open={state.showActionModal} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="sm:max-w-[425px] border-0 rounded-xl shadow-xl bg-background sm:top-[50%] sm:translate-y-[-50%] bottom-0 top-auto h-[95vh] max-h-[100dvh] flex flex-col overflow-hidden">
           <div className="absolute inset-0 rounded-xl border-2 border-primary/10 backdrop-blur-sm" />
           <div className="relative z-10 h-full flex flex-col">
             <DialogHeader className="shrink-0 px-6 pt-6 pb-3">
-              <h3 className="text-lg font-semibold capitalize">{activeAction}</h3>
+              <DialogTitle className="text-lg font-semibold capitalize">{state.activeAction}</DialogTitle>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-6" key={activeAction}>
-              {activeAction === "send" && <SendModal {...sendModalProps} />}
-              {activeAction === "receive" && <ReceiveModal />}
-              {activeAction === "history" && <TransactionHistoryModal />}
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
+              {state.activeAction === "send" && <SendModal />}
+              {state.activeAction === "receive" && <ReceiveModal />}
+              {state.activeAction === "history" && <TransactionHistoryModal />}
             </div>
           </div>
         </DialogContent>

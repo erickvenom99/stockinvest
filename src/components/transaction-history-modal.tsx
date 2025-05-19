@@ -25,7 +25,9 @@ export default function TransactionHistoryModal() {
   useEffect(() => {
     const loadTransactions = async () => {
       try {
-        const data = await fetchTransactions()
+        // Pass the type filter if not "all"
+        const type = filter === "deposit" || filter === "withdrawal" ? filter : undefined
+        const data = await fetchTransactions(type)
         setTransactions(data)
       } catch (error) {
         console.error("Failed to load transactions:", error)
@@ -35,12 +37,9 @@ export default function TransactionHistoryModal() {
     }
 
     loadTransactions()
-  }, [])
+  }, [filter])
 
   const filteredTransactions = transactions.filter((tx) => {
-    // Apply type filter
-    if (filter !== "all" && tx.type !== filter) return false
-
     // Apply search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -99,8 +98,8 @@ export default function TransactionHistoryModal() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Transactions</SelectItem>
-            <SelectItem value="send">Sent</SelectItem>
-            <SelectItem value="receive">Received</SelectItem>
+            <SelectItem value="deposit">Deposits</SelectItem>
+            <SelectItem value="withdrawal">Withdrawals</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -120,10 +119,10 @@ export default function TransactionHistoryModal() {
                   <div
                     className={cn(
                       "w-8 h-8 rounded-full flex items-center justify-center",
-                      tx.type === "receive" ? "bg-green-100" : "bg-red-100",
+                      tx.type === "deposit" ? "bg-green-100" : "bg-red-100",
                     )}
                   >
-                    {tx.type === "receive" ? (
+                    {tx.type === "deposit" ? (
                       <ArrowDownRight className="w-4 h-4 text-green-600" />
                     ) : (
                       <ArrowUpRight className="w-4 h-4 text-red-600" />
@@ -145,7 +144,7 @@ export default function TransactionHistoryModal() {
                   />
                   <div className="text-right">
                     <div className="font-medium">
-                      {tx.type === "receive" ? "+" : "-"}
+                      {tx.type === "deposit" ? "+" : "-"}
                       {tx.amount} {tx.currency}
                     </div>
                     <div className={cn("text-xs", tx.status === "completed" ? "text-green-600" : "text-yellow-600")}>
