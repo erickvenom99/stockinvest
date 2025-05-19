@@ -8,7 +8,7 @@ module.exports = {
     domains: ['assets.coingecko.com']
   },
   experimental: {
-    serverActions: true,
+    serverActions: {},
   }
 }
 export default nextConfig;

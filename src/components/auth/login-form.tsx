@@ -1,6 +1,7 @@
 "use client";
 
 import CardWrapper from "./card-wrapper";
+import ReCAPTCHA from "react-google-recaptcha";
 import {
   Form,
   FormControl,
@@ -10,35 +11,42 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { LoginSchema } from "@root/schema"; // Assuming you have a LoginSchema
+import { LoginSchema } from "@root/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Input } from "../ui/input";
 import type { z } from "zod";
-import { UserIcon, MailIcon, LockIcon } from "lucide-react";
+import { MailIcon, LockIcon } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from "next/navigation"; // Import useRouter for redirection
+import { useRouter } from "next/navigation";
 import { useUser } from '@/contexts/user/user-context';
 
 type FormData = z.infer<typeof LoginSchema>;
 
 const LoginForm = () => {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null); // State for login errors
-  const router = useRouter(); // Initialize the router
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const { fetchUser } = useUser();
+  const [recaptchaValue, setRecaptchaValue] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(LoginSchema),
     defaultValues: {
-      email: "", // Changed from identifier to email to match your previous form
+      email: "",
       password: "",
     },
   });
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
-    setError(null); // Clear any previous errors
+    setError(null);
+
+    if (!recaptchaValue) {
+      setLoading(false);
+      setError("Please complete the CAPTCHA verification");
+      return;
+    }
 
     try {
       const response = await fetch("/api/login", {
@@ -46,20 +54,25 @@ const LoginForm = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          recaptchaToken: recaptchaValue,
+        }),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
+        throw new Error(responseData.error || 'Login failed');
       }
 
       await fetchUser();
       router.push('/dashboard');
-
-    } catch (e) {
-      console.error("Error during login:", e);
-      setError("An unexpected error occurred");
+    } catch (error) {
+      console.error("Login error:", error);
+      setError(
+        error instanceof Error ? error.message : "An unexpected error occurred"
+      );
     } finally {
       setLoading(false);
     }
@@ -80,20 +93,11 @@ const LoginForm = () => {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    Email<span className="text-red-500">*</span>
-                  </FormLabel>
+                  <FormLabel>Email<span className="text-red-500">*</span></FormLabel>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <MailIcon className="h-4 w-4 text-gray-500" />
-                    </div>
+                    <MailIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="email"
-                        placeholder="johndoe@email.com"
-                        className="pl-10 h-10 text-lg"
-                      />
+                      <Input {...field} className="pl-10 h-10 text-lg" />
                     </FormControl>
                     <FormMessage />
                   </div>
@@ -105,20 +109,11 @@ const LoginForm = () => {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    Password <span className="text-red-500">*</span>
-                  </FormLabel>
+                  <FormLabel>Password <span className="text-red-500">*</span></FormLabel>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <LockIcon className="h-4 w-4 text-gray-500" />
-                    </div>
+                    <LockIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="********"
-                        className="pl-10 h-10 text-lg"
-                      />
+                      <Input {...field} type="password" className="pl-10 h-10 text-lg" />
                     </FormControl>
                     <FormMessage />
                   </div>
@@ -126,9 +121,21 @@ const LoginForm = () => {
               )}
             />
           </div>
+
+          <ReCAPTCHA
+            sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+            onChange={(token) => setRecaptchaValue(token)}
+            onExpired={() => setRecaptchaValue(null)}
+          />
+
           {error && <p className="text-red-500">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Logging in...." : "Login"}
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || !recaptchaValue}
+          >
+            {loading ? "Logging in..." : "Login"}
           </Button>
         </form>
       </Form>
