@@ -1,117 +1,120 @@
-'use client';
-import { createContext, ReactNode, useContext, useState, useEffect, useCallback } from 'react';
-import { UserContextType, User } from './user-context.types';
+"use client"
 
-const TOKEN_CHECK_INTERVAL = 60000; // 60 seconds
-const TOKEN_EXPIRATION_BUFFER = 30000; // 30 seconds
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { getCurrentUser, login, logout as apiLogout, type User } from "@/lib/api/auth"
 
-export const UserContext = createContext<UserContextType>({
-  user: null,
-  loading: true,
-  error: null,
-  logout: () => {},
-  fetchUser: async () => {},
-});
+interface UserContextType {
+  user: User | null
+  loading: boolean
+  error: Error | null
+  login: (email: string, password: string) => Promise<User | null>
+  logout: () => Promise<boolean>
+  updateUser: (userData: Partial<User>) => Promise<boolean>
+}
+
+const UserContext = createContext<UserContextType | null>(null)
 
 export const useUser = () => {
-  const context = useContext(UserContext);
+  const context = useContext(UserContext)
   if (!context) {
-    throw new Error('useUser must be used within a UserProvider');
+    throw new Error("useUser must be used within a UserProvider")
   }
-  return context;
-};
+  return context
+}
 
-export function UserProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<Pick<UserContextType, 'user' | 'loading' | 'error'>>({
-    user: null,
-    loading: true,
-    error: null,
-  });
+interface UserProviderProps {
+  children: ReactNode
+}
 
-  const handleLogout = useCallback(() => {
-    document.cookie = `authToken=; Path=/; Secure; HttpOnly; SameSite=Strict; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
-    setState(prev => ({
-      ...prev,
-      user: null,
-      loading: false,
-      error: null,
-    }));
-  }, []);
-
-  const fetchUser = useCallback(async () => {
-    try {
-      const response = await fetch('/api/current-user', {
-        credentials: 'include'
-      });
-
-      if (response.status === 401) {
-        console.log('could not fetch user from api endpoint')
-        handleLogout();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch user data');
-      }
-
-      const userData: User = await response.json();
-      setState(prev => ({
-        ...prev,
-        user: userData,
-        loading: false,
-        error: null,
-      }));
-    } catch (err) {
-      setState(prev => ({
-        ...prev,
-        error: err instanceof Error ? err.message : 'Unknown error',
-        loading: false
-      }));
-      console.error('User fetch error:', err);
-    }
-  }, [handleLogout]);
-
-  const checkToken = useCallback(() => {
-    try {
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('authToken='))
-        ?.split('=')[1];
-
-      if (!token) {
-        handleLogout();
-        return;
-      }
-
-      const { exp } = JSON.parse(atob(token.split('.')[1]));
-      if (Date.now() + TOKEN_EXPIRATION_BUFFER >= exp * 1000) {
-        handleLogout();
-      }
-    } catch (e) {
-      console.error('Token validation error:', e);
-      handleLogout();
-    }
-  }, [handleLogout]);
+export const UserProvider = ({ children }: UserProviderProps) => {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    fetchUser();
-    const checkAndSchedule = () => {
-        checkToken();
-        return setInterval(checkToken, 60000);
-    };
-    const interval = checkAndSchedule();
-    return () => clearInterval(interval);
-  }, [fetchUser, checkToken]);
+    const fetchUser = async () => {
+      try {
+        const userData = await getCurrentUser()
+        setUser(userData)
+
+        // Load profile image from localStorage if available
+        if (userData && localStorage.getItem("profileImage")) {
+          // We don't need to do anything here as the Avatar component will handle this
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error("Failed to fetch user"))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchUser()
+  }, [])
+
+  const loginUser = async (email: string, password: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const userData = await login({ email, password })
+      setUser(userData)
+      return userData
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Login failed"))
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const logoutUser = async () => {
+    setLoading(true)
+    try {
+      const success = await apiLogout()
+      if (success) {
+        setUser(null)
+      }
+      return success
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Logout failed"))
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updateUser = async (userData: Partial<User>) => {
+    if (!user) return false
+
+    setLoading(true)
+    try {
+      // In a real app, you would call an API endpoint here
+      // For now, we'll just update the local state
+      setUser({ ...user, ...userData })
+
+      // Store in localStorage for persistence
+      localStorage.setItem("userData", JSON.stringify({ ...user, ...userData }))
+
+      return true
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Update failed"))
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <UserContext.Provider
       value={{
-        ...state,
-        logout: handleLogout,
-        fetchUser,
+        user,
+        loading,
+        error,
+        login: loginUser,
+        logout: logoutUser,
+        updateUser,
       }}
     >
       {children}
     </UserContext.Provider>
-  );
+  )
 }

@@ -35,12 +35,26 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // Find the transaction
     const transaction = await Transaction.findById(id)
     if (!transaction) {
-      return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
+      return NextResponse.json({ error: "Transaction not found", status: "failed" }, { status: 404 })
     }
 
     // Check if transaction is already confirmed
     if (transaction.status === "completed") {
       return NextResponse.json({ status: "confirmed", txHash: transaction.txHash })
+    }
+
+    // Check if transaction is already marked as failed
+    if (transaction.status === "failed") {
+      return NextResponse.json({ status: "failed" })
+    }
+
+    // Check if transaction is too old (more than 30 minutes)
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+    if (transaction.initiatedAt < thirtyMinutesAgo && transaction.status === "pending") {
+      // Mark as failed if it's been pending for too long
+      transaction.status = "failed"
+      await transaction.save()
+      return NextResponse.json({ status: "failed" })
     }
 
     // Verify the transaction on the blockchain
@@ -79,6 +93,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ status: "pending" })
   } catch (error) {
     console.error("Error verifying transaction:", error)
-    return NextResponse.json({ error: "Failed to verify transaction" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to verify transaction", status: "failed" }, { status: 500 })
   }
 }

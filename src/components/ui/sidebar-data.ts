@@ -1,4 +1,4 @@
-import { Home, PieChart, LineChart, CreditCard, BarChart3, Users, LifeBuoy } from "lucide-react"
+import { Home, PieChart, LineChart, CreditCard, BarChart3, User, LifeBuoy } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 export type SideBarRoute = {
@@ -45,9 +45,9 @@ export const otherRoutes: SideBarRoute[] = [
     section: "other",
   },
   {
-    title: "Accounts",
-    url: "/accounts",
-    icon: Users,
+    title: "Account",
+    url: "/account",
+    icon: User,
     section: "other",
   },
   {

@@ -4,7 +4,12 @@ import type React from "react"
 
 import { createContext, type ReactNode, useContext, useState, useEffect } from "react"
 import { toast } from "sonner"
-import { createAndTrackTransaction, getActiveVerifications, stopVerification } from "@/lib/services/transaction-tracker"
+import {
+  createAndTrackTransaction,
+  getActiveVerifications,
+  stopVerification,
+  checkVerificationTimeout,
+} from "@/lib/services/transaction-tracker"
 import type { Plan } from "@/types/plan"
 
 // Define the wallet configuration
@@ -90,27 +95,42 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     const activeVerifications = getActiveVerifications()
     if (activeVerifications.length > 0) {
       const [key, verification] = activeVerifications[0]
-      setState((prev) => ({
-        ...prev,
-        verificationStarted: true,
-        verificationStatus: "pending",
-        currency: verification.currency,
-        selectedPlan: verification.planName
-          ? {
-              name: verification.planName,
-              range: "",
-              minAmount: verification.minAmount,
-              bonus: "",
-              duration: "",
-              color: "",
-            }
-          : null,
-        activeVerificationKey: key,
-      }))
 
-      toast.info("Transaction Verification", {
-        description: "We're still verifying your previous transaction",
-      })
+      // Check if verification has timed out
+      if (checkVerificationTimeout(key)) {
+        stopVerification(key)
+        setState((prev) => ({
+          ...prev,
+          verificationStatus: "failed",
+          verificationStarted: false,
+          activeVerificationKey: null,
+        }))
+        toast.error("Transaction Verification Timeout", {
+          description: "Your previous transaction verification has timed out.",
+        })
+      } else {
+        setState((prev) => ({
+          ...prev,
+          verificationStarted: true,
+          verificationStatus: "pending",
+          currency: verification.currency,
+          selectedPlan: verification.planName
+            ? {
+                name: verification.planName,
+                range: "",
+                minAmount: verification.minAmount,
+                bonus: "",
+                duration: "",
+                color: "",
+              }
+            : null,
+          activeVerificationKey: key,
+        }))
+
+        toast.info("Transaction Verification", {
+          description: "We're still verifying your previous transaction",
+        })
+      }
     }
   }, [])
 

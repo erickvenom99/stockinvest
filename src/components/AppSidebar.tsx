@@ -13,9 +13,11 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useUser } from "@/contexts/user/user-context"
 import { cn } from "@/lib/utils"
 import { type SideBarRoute, mainRoutes, otherRoutes } from "./ui/sidebar-data"
+import { useEffect, useState } from "react"
 
 type AppSidebarProps = {
   collapsed: boolean
@@ -31,12 +33,24 @@ type UserProfileProps = {
 const UserProfile = ({ collapsed, user }: UserProfileProps) => {
   const username = user?.username || "User"
   const initial = username[0].toUpperCase()
+  const [profileImage, setProfileImage] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Load profile image from localStorage
+    const savedImage = localStorage.getItem("profileImage")
+    if (savedImage) {
+      setProfileImage(savedImage)
+    }
+  }, [])
 
   return (
     <div className="flex flex-1 items-center gap-2">
-      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">
-        {collapsed ? initial : <span className="text-sm">{initial}</span>}
-      </div>
+      <Avatar className="w-8 h-8">
+        <AvatarImage src={profileImage || undefined} />
+        <AvatarFallback className="bg-blue-500 text-white">
+          {collapsed ? initial : <span className="text-sm">{initial}</span>}
+        </AvatarFallback>
+      </Avatar>
       {!collapsed && (
         <div className="flex flex-col">
           <span className="font-medium text-sm">{username}</span>

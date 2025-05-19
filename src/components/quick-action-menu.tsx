@@ -9,6 +9,7 @@ import ReceiveModal from "@/components/receive-modal"
 import TransactionHistoryModal from "@/components/transaction-history-modal"
 import { useRouter } from "next/navigation"
 import { useTransaction } from "@/contexts/transaction/transaction-context"
+import { useState } from "react"
 
 interface QuickActionMenuProps {
   className?: string
@@ -17,8 +18,10 @@ interface QuickActionMenuProps {
 export default function QuickActionMenu({ className }: QuickActionMenuProps) {
   const router = useRouter()
   const { state, handleQuickAction, closeModal } = useTransaction()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
 
   const handleNavigate = (path: string) => {
+    setDropdownOpen(false) // Close dropdown when navigating
     router.push(path)
   }
 
@@ -41,7 +44,7 @@ export default function QuickActionMenu({ className }: QuickActionMenuProps) {
           <ArrowDownRight className="w-6 h-6" />
           <span>Receive</span>
         </Button>
-        <DropdownMenu>
+        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="secondary"
@@ -52,7 +55,12 @@ export default function QuickActionMenu({ className }: QuickActionMenuProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={() => handleQuickAction("history")}>
+            <DropdownMenuItem
+              onClick={() => {
+                setDropdownOpen(false)
+                handleQuickAction("history")
+              }}
+            >
               <Clock className="mr-2 h-4 w-4" />
               <span>Transaction History</span>
             </DropdownMenuItem>
@@ -68,9 +76,9 @@ export default function QuickActionMenu({ className }: QuickActionMenuProps) {
               <RefreshCw className="mr-2 h-4 w-4" />
               <span>Market Data</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNavigate("/accounts")}>
+            <DropdownMenuItem onClick={() => handleNavigate("/account")}>
               <CreditCard className="mr-2 h-4 w-4" />
-              <span>Manage Accounts</span>
+              <span>Account Settings</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
