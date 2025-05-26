@@ -244,13 +244,13 @@ export default function TransactionsPage() {
           <tbody>
             {transactions.length > 0 ? (
               transactions.map((tx) => (
-                <tr key={tx.id} className="border-b hover:bg-muted/50">
+                <tr key={tx.id} className="border-b hover:bg-muted/50 dark:hover:bg-muted/30">
                   <td className="py-4 px-4">
                     <div className="flex items-center">
                       <div
                         className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center mr-3",
-                          tx.type === "deposit" ? "bg-green-100" : "bg-red-100",
+                          tx.type === "deposit" ? "bg-green-100 dark:bg-green-900" : "bg-red-100 dark:bg-red-900",
                         )}
                       >
                         {tx.type === "deposit" ? (
@@ -282,16 +282,22 @@ export default function TransactionsPage() {
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex justify-center">
-                      <span
-                        className={cn(
-                          "px-2 py-1 rounded-full text-xs",
-                          tx.status === "completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700",
-                        )}
-                      >
-                        {tx.status === "completed" ? "Completed" : "Pending"}
-                      </span>
+                      {tx.status === "completed" ? (
+                        <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                          Completed
+                        </span>
+                      ) : tx.status === "failed" ? (
+                        <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
+                          Failed
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+                          Pending
+                        </span>
+                      )}
                     </div>
                   </td>
+
                   <td className="py-4 px-4 text-right">
                     <Button
                       variant="ghost"

@@ -1,8 +1,51 @@
-import mongoose, { Schema, model } from 'mongoose';
+import mongoose, { Schema, model, Document, Model } from 'mongoose';
 import validator from 'validator';
 import bcrypt from 'bcrypt';
 
-const userSchema = new Schema(
+// Preferences sub-schema
+const EmailNotificationsSchema = new Schema(
+  {
+    marketUpdates: { type: Boolean, default: false },
+    securityAlerts: { type: Boolean, default: true },
+    transactionNotifications: { type: Boolean, default: true },
+    newsletter: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const PreferencesSchema = new Schema(
+  {
+    defaultCurrency: { type: String, default: 'USD' },
+    theme: { type: String, enum: ['system', 'light', 'dark'], default: 'system' },
+    emailNotifications: { type: EmailNotificationsSchema, default: () => ({}) },
+  },
+  { _id: false }
+);
+
+export interface IUser extends Document {
+  username: string;
+  fullname: string;
+  email: string;
+  password: string;
+  phoneNumber?: string;
+  country: string;
+  referralID?: string;
+  isVerified: boolean;
+  lastLogin?: Date;
+  preferences: {
+    defaultCurrency: string;
+    theme: 'system' | 'light' | 'dark';
+    emailNotifications: {
+      marketUpdates: boolean;
+      securityAlerts: boolean;
+      transactionNotifications: boolean;
+      newsletter: boolean;
+    };
+  };
+  comparePassword(candidatePassword: string): Promise<boolean>;
+}
+
+const userSchema = new Schema<IUser>(
   {
     username: {
       type: String,
@@ -38,7 +81,7 @@ const userSchema = new Schema(
       type: String,
       trim: true,
       validate: {
-        validator: (v: string) => validator.isMobilePhone(v, 'any'), // Supports international numbers
+        validator: (v: string) => validator.isMobilePhone(v, 'any'),
         message: 'Please provide a valid phone number',
       },
     },
@@ -59,45 +102,42 @@ const userSchema = new Schema(
     lastLogin: {
       type: Date,
     },
-  
+    preferences: { type: PreferencesSchema, default: () => ({}) },
   },
-
   {
-    timestamps: true, // Adds createdAt and updatedAt
-    toJSON: { virtuals: true }, // Include virtuals when converting to JSON
+    timestamps: true,
+    toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-// Password hashing middleware
-userSchema.pre('save', async function (next) {
+// Hash password on save
+userSchema.pre<IUser>('save', async function (next) {
   if (!this.isModified('password')) return next();
   try {
-    const salt = await bcrypt.genSalt(10)
-    this.password = await bcrypt.hash(this.password, salt)
-    next()
-    console.log("Pre-save hook: password modified?", this.isModified('password'));
-    console.log("Password before hash:", this.password?.substring(0, 10));
-  }
-  catch (error) {
-    next(error as Error)
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err as Error);
   }
 });
 
-
-
-// Method to compare passwords
-userSchema.methods.comparePassword = async function (
+// Compare passwords
+userSchema.methods.comparePassword = function (
   candidatePassword: string
-) {
-  return await bcrypt.compare(candidatePassword, this.password);
+): Promise<boolean> {
+  // password was excluded by default; need to select it when querying
+  // so ensure to query with .select('+password') in your auth logic
+  return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Virtual for profile URL (example)
+// Virtual profile URL
 userSchema.virtual('profileURL').get(function () {
   return `/users/${this.username}`;
 });
 
-const User = mongoose.models.User || mongoose.model('User', userSchema);
+const User: Model<IUser> =
+  mongoose.models.User || model<IUser>('User', userSchema);
 
 export default User;

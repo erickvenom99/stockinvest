@@ -56,6 +56,7 @@ export interface PortfolioSummary {
 export async function fetchPortfolioData(): Promise<PortfolioSummary | null> {
   try {
     const response = await fetch("/api/investments", {
+      credentials: 'include',
       next: { revalidate: 60 }, // Revalidate every minute at most
     })
 

@@ -6,9 +6,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 
+// Paths that don't require authentication
+const PUBLIC_PATHS = ['/_next', 'static', '/', 'favicon.ico']
+
 export async function middleware(request: NextRequest) {
     const token = request.cookies.get('authToken')?.value;
     const { pathname } = request.nextUrl;
+
+    if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) return NextResponse.next();
 
     // If on auth pages, redirect logged-in users
     if (pathname.startsWith('/auth')) {

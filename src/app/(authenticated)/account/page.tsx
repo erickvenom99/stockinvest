@@ -13,6 +13,8 @@ import { useUser } from "@/contexts/user/user-context"
 import { toast } from "sonner"
 import { Loader2, Camera, Save, User, Lock, Shield, LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useTheme } from 'next-themes'
+import { Preferences } from "@/contexts/user/user-context.types"
 
 export default function AccountPage() {
   const { user, loading, updateUser, logout } = useUser()
@@ -29,6 +31,22 @@ export default function AccountPage() {
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const { theme, setTheme} = useTheme()
+  const [prefs, setPrefs] = useState<Preferences>(user?.preferences ?? {
+    defaultCurrency: "USD",
+    theme: "system",
+    emailNotifications: {
+      marketUpdates: false,
+      securityAlerts: true,
+      transactionNotifications: true,
+      newsletter: false,
+    },
+  })
+  const savePrefs = async () => {
+    const success = await updateUser({ preferences: prefs })
+    if (success) toast.success('Preferences saved');
+    else toast.error('Failed to save preferences')
+  }
 
   useEffect(() => {
     if (user) {
@@ -41,13 +59,14 @@ export default function AccountPage() {
         confirmPassword: "",
       })
 
+      if (user.preferences?.theme) setTheme(user.preferences.theme);
       // Load profile image from localStorage
       const savedImage = localStorage.getItem("profileImage")
       if (savedImage) {
         setProfileImage(savedImage)
       }
     }
-  }, [user])
+  }, [user, setTheme])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -364,7 +383,18 @@ export default function AccountPage() {
 
                   <div className="grid gap-2">
                     <Label htmlFor="theme">Theme</Label>
-                    <select id="theme" className="rounded-md border p-2">
+                    <select 
+                      id="theme" 
+                      className="rounded-md border p-2"
+                      value={prefs.theme}
+                      onChange={(e) => {
+                        const newTheme = e.target.value as 'system' | 'light' | 'dark';
+                        setPrefs(prev => ({
+                          ...prev, theme: newTheme
+                        }));
+                        setTheme(newTheme);
+                      }}
+                    >
                       <option value="system">System Default</option>
                       <option value="light">Light</option>
                       <option value="dark">Dark</option>
@@ -374,7 +404,7 @@ export default function AccountPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="w-full">Save Preferences</Button>
+              <Button className="w-full" onClick={savePrefs}>Save Preferences</Button>
             </CardFooter>
           </Card>
         </TabsContent>

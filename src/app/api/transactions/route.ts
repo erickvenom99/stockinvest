@@ -6,6 +6,12 @@ import { verifyToken } from "@/lib/auth"
 export async function POST(req: NextRequest) {
   await connectDB()
 
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+  await Transaction.updateMany(
+    { status: "pending", initiatedAt: { $lt: thirtyMinutesAgo } },
+    { status: "failed" }
+  )
+
   // Authenticate
   const cookie = req.cookies.get("authToken")?.value
   if (!cookie) {

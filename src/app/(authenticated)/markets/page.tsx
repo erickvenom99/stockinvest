@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { fetchMarketData, type CryptoData } from "@/lib/api/market"
 import { Skeleton } from "@/components/ui/skeleton"
+import MarketRow from "@/components/MarketRow"
 
 export default function MarketsPage() {
   const [marketData, setMarketData] = useState<CryptoData[]>([])
@@ -123,8 +124,13 @@ export default function MarketsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[...Array(10)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
+                {marketData.slice(0, 10).map((coin) => (
+                <MarketRow
+                  key={coin.id}
+                  coin={coin}
+                  toggleFavorite={toggleFavorite}
+                  isFavorite={favorites.includes(coin.id)}
+                />
                 ))}
               </div>
             </CardContent>

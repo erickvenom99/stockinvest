@@ -1,227 +1,173 @@
-// lib/services/transaction-tracker.ts
-// This service handles transaction tracking even when users navigate away
-import { createTransaction, verifyTransaction } from "@/lib/api/transactions"
-import { createNewInvestment } from "@/lib/api/portfolio"
 import { toast } from "sonner"
+import { createTransaction, verifyTransaction } from "@/lib/api/transactions"
 
-// Store active transaction verifications
-const activeVerifications = new Map<
-  string,
-  {
-    transactionId: string
-    currency: "BTC" | "USDT"
-    minAmount: number
-    planName?: string
-    interval: NodeJS.Timeout
-    timeout: NodeJS.Timeout
-    startTime: number
-    onSuccess?: () => void
-    onFailure?: () => void
-  }
->()
+// Key under which we store pending verifications
+const STORAGE_KEY = "pendingTransactions"
 
-// Maximum verification time (30 minutes in milliseconds)
-const MAX_VERIFICATION_TIME = 30 * 60 * 1000
-
-// Initialize the service
-export function initTransactionTracker() {
-  // Load any saved transactions from localStorage
-  try {
-    const savedTransactions = localStorage.getItem("pendingTransactions")
-    if (savedTransactions) {
-      const transactions = JSON.parse(savedTransactions)
-      transactions.forEach((tx: any) => {
-        if (tx.transactionId && tx.currency && tx.minAmount) {
-          startVerification(
-            tx.transactionId,
-            tx.currency,
-            tx.minAmount,
-            tx.planName,
-            undefined,
-            undefined,
-            tx.startTime || Date.now(),
-          )
-        }
-      })
-    }
-  } catch (error) {
-    console.error("Error loading saved transactions:", error)
-  }
-}
-
-// Save active verifications to localStorage
-function saveActiveVerifications() {
-  const transactions = Array.from(activeVerifications.entries()).map(([key, value]) => ({
-    key,
-    transactionId: value.transactionId,
-    currency: value.currency,
-    minAmount: value.minAmount,
-    planName: value.planName,
-    startTime: value.startTime,
-  }))
-  localStorage.setItem("pendingTransactions", JSON.stringify(transactions))
-}
-
-// Create a transaction and start verification
-export async function createAndTrackTransaction(params: {
-  amount: number
+// Shape of a persisted verification
+export interface PendingVerification {
+  key: string
+  transactionId: string
   currency: "BTC" | "USDT"
-  toAddress: string
+  minAmount: number
   planName?: string
+  startTime: number
   onSuccess?: () => void
   onFailure?: () => void
-}): Promise<string | null> {
-  const { amount, currency, toAddress, planName, onSuccess, onFailure } = params
-
-  // Create the transaction
-  const result = await createTransaction({
-    amount,
-    currency,
-    toAddress,
-    type: "deposit", // Explicitly set as deposit for investments
-  })
-
-  if (!result) {
-    if (onFailure) onFailure()
-    return null
-  }
-
-  // Start verification
-  startVerification(result._id, currency, amount, planName, onSuccess, onFailure)
-
-  // Return the transaction ID
-  return result._id
+  interval?: NodeJS.Timeout
+  timeout?: NodeJS.Timeout
 }
 
-// Start verification process for a transaction
+/**
+ * Read all saved verifications from localStorage.
+ * Returns an array of [key, data] pairs.
+ */
+export function getActiveVerifications(): [string, Omit<PendingVerification, "key">][] {
+  if (typeof window === "undefined") return []
+  const raw = localStorage.getItem(STORAGE_KEY) || "[]"
+  const arr: PendingVerification[] = JSON.parse(raw)
+  return arr.map(v => [
+    v.key,
+    {
+      transactionId: v.transactionId,
+      currency: v.currency,
+      minAmount: v.minAmount,
+      planName: v.planName,
+      startTime: v.startTime,
+      onSuccess: v.onSuccess,
+      onFailure: v.onFailure,
+    },
+  ])
+}
+
+/** Persist the in-memory map back to localStorage */
+function saveActiveVerifications(map: Map<string, PendingVerification>) {
+  const arr = Array.from(map.values()).map(v => ({ ...v, key: v.key }))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr))
+}
+
+/** Stop polling & timeout for a given verification key */
+export function stopVerification(key: string) {
+  const map = new Map<string, PendingVerification>(
+    getActiveVerifications().map(([k, v]) => [k, { ...v, key: k }]),
+  )
+  const entry = map.get(key)
+  if (entry) {
+    if (entry.interval) clearInterval(entry.interval)
+    if (entry.timeout) clearTimeout(entry.timeout)
+    map.delete(key)
+    saveActiveVerifications(map)
+  }
+}
+
+/**
+ * Start or resume verification polling for a transaction.
+ * @param persistedStartTime If provided, resumes the original start time.
+ */
 export function startVerification(
   transactionId: string,
   currency: "BTC" | "USDT",
   minAmount: number,
-  planName?: string,
-  onSuccess?: () => void,
-  onFailure?: () => void,
-  startTime: number = Date.now(),
+  planName: string | undefined,
+  onSuccess: () => void,
+  onFailure: () => void,
+  persistedStartTime?: number
 ) {
-  // Generate a unique key for this verification
-  const key = `${transactionId}-${Date.now()}`
+  // Determine start time
+  const startTime = persistedStartTime ?? Date.now()
+  const key = `${transactionId}-${startTime}`
 
-  // Calculate remaining time if this is a resumed verification
-  const elapsedTime = Date.now() - startTime
-  const remainingTime = Math.max(0, MAX_VERIFICATION_TIME - elapsedTime)
+  // Rehydrate existing map
+  const map = new Map<string, PendingVerification>(
+    getActiveVerifications().map(([k, v]) => [k, { ...v, key: k }])
+  )
 
-  // If verification has already timed out, fail immediately
-  if (remainingTime === 0) {
-    if (onFailure) onFailure()
-    toast.error("Verification Timeout", {
-      description: "The transaction verification timed out. Please try again.",
-    })
-    return null
-  }
-
-  // Set up the timeout based on remaining time
-  const timeout = setTimeout(() => {
-    stopVerification(key)
-    toast.error("Verification Timeout", {
-      description: "The transaction verification timed out. Please try again.",
-    })
-    if (onFailure) onFailure()
-  }, remainingTime)
-
-  // Begin polling for verification
-  const interval = setInterval(async () => {
-    try {
-      const verificationResult = await verifyTransaction(transactionId, currency, minAmount)
-
-      if (verificationResult.status === "confirmed") {
-        // Transaction confirmed
-        toast.success("Payment Verified", {
-          description: "Your transaction has been confirmed on the blockchain",
-        })
-
-        // If this was for an investment, create it
-        if (planName) {
-          const success = await createNewInvestment({
-            transactionId,
-            planName,
-            amount: minAmount,
-            currency,
-          })
-
-          if (success) {
-            toast.success("Investment Created", {
-              description: `Your ${planName} plan investment has been created successfully`,
-            })
-          }
-        }
-
-        // Clean up and call success callback
-        stopVerification(key)
-        if (onSuccess) onSuccess()
-      } else if (verificationResult.status === "failed") {
-        // Transaction failed
-        toast.error("Verification Failed", {
-          description: "The transaction could not be verified. Please check the details and try again.",
-        })
-
-        stopVerification(key)
-        if (onFailure) onFailure()
-      }
-    } catch (error) {
-      console.error("Error verifying transaction:", error)
-    }
-  }, 15000) // Check every 15 seconds
-
-  // Store the verification
-  activeVerifications.set(key, {
+  // Insert or update entry
+  map.set(key, {
+    key,
     transactionId,
     currency,
     minAmount,
     planName,
-    interval,
-    timeout,
     startTime,
     onSuccess,
     onFailure,
   })
+  saveActiveVerifications(map)
 
-  // Save to localStorage
-  saveActiveVerifications()
+  // Set up 30-minute timeout
+  const timeout = setTimeout(() => {
+    clearInterval(interval)
+    map.delete(key)
+    saveActiveVerifications(map)
+    toast.error("Verification Timeout", {
+      description: "Your transaction has timed out after 30 minutes.",
+    })
+    onFailure()
+  }, 30 * 60 * 1000)
 
-  return key
+  // Poll every 30 seconds
+  const interval = setInterval(async () => {
+    const elapsedMin = (Date.now() - startTime) / 1000 / 60
+    // If elapsed exceeds 30, let the timeout handler execute
+    if (elapsedMin >= 30) return
+
+    try {
+      const resp = await verifyTransaction(transactionId, currency, minAmount)
+      if (resp.status === "confirmed") {
+        clearInterval(interval)
+        clearTimeout(timeout)
+        map.delete(key)
+        saveActiveVerifications(map)
+        onSuccess()
+      } else if (resp.status === "failed") {
+        clearInterval(interval)
+        clearTimeout(timeout)
+        map.delete(key)
+        saveActiveVerifications(map)
+        onFailure()
+      }
+    } catch (err) {
+      console.error("Verification poll error:", err)
+    }
+  }, 30_000)
+
+  // Store handles for clean-up
+  map.set(key, { ...map.get(key)!, interval, timeout })
+  saveActiveVerifications(map)
 }
 
-// Stop a verification process
-export function stopVerification(key: string) {
-  const verification = activeVerifications.get(key)
-  if (verification) {
-    clearInterval(verification.interval)
-    clearTimeout(verification.timeout)
-    activeVerifications.delete(key)
-    saveActiveVerifications()
-  }
-}
-
-// Stop all verifications
-export function stopAllVerifications() {
-  activeVerifications.forEach((verification, key) => {
-    clearInterval(verification.interval)
-    clearTimeout(verification.timeout)
+/**
+ * Create a transaction on the server, then start verification polling.
+ */
+export async function createAndTrackTransaction(params: {
+  amount: number
+  currency: "BTC" | "USDT"
+  toAddress: string
+  planName: string
+  onSuccess: () => void
+  onFailure: () => void
+}): Promise<string | null> {
+  // Create the transaction record
+  const result = await createTransaction({
+    amount: params.amount,
+    currency: params.currency,
+    toAddress: params.toAddress,
   })
-  activeVerifications.clear()
-  localStorage.removeItem("pendingTransactions")
-}
+  if (!result?._id) {
+    params.onFailure()
+    return null
+  }
 
-// Get all active verifications
-export function getActiveVerifications() {
-  return Array.from(activeVerifications.entries())
-}
+  // Kick off polling, starting now
+  startVerification(
+    result._id,
+    params.currency,
+    params.amount,
+    params.planName,
+    params.onSuccess,
+    params.onFailure
+  )
 
-// Check if a transaction has been running too long and should be failed
-export function checkVerificationTimeout(key: string): boolean {
-  const verification = activeVerifications.get(key)
-  if (!verification) return false
-
-  const elapsedTime = Date.now() - verification.startTime
-  return elapsedTime >= MAX_VERIFICATION_TIME
+  return result._id
 }

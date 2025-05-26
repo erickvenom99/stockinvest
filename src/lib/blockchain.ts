@@ -4,6 +4,13 @@ export async function findIncomingTransactionToAddress(
     currency: 'BTC' | 'USDT',
     since?: number
   ): Promise<{ txHash: string; amount: number; timestamp: number } | null> {
+    if (process.env.NODE_ENV === "development") {
+      return {
+        txHash: "TESTNET123FAKEHASH",
+        amount: minAmount,
+        timestamp: Date.now(),
+      }
+    }
     try {
       if (currency === 'BTC') {
         const res = await fetch(`https://blockstream.info/api/address/${address}/txs`);

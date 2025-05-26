@@ -130,6 +130,7 @@ export default function PortfolioPage() {
   }
 
   const { change24h, changeValue } = calculateChange()
+  const latestValue = portfolioData?.portfolioHistory?.at(-1)?.totalValue ?? 0
 
   if (loading) {
     return (
@@ -148,7 +149,7 @@ export default function PortfolioPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <PortfolioChart
           portfolioHistory={portfolioData?.portfolioHistory || []}
-          totalValue={portfolioData?.totalValue || 0}
+          totalValue={latestValue}
           change24h={change24h}
           changeValue={changeValue}
         />

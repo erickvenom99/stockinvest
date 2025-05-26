@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { id } = params
+  const { id } = await params
   const { searchParams } = new URL(req.url)
   const currency = searchParams.get("currency") as "BTC" | "USDT"
   const minAmount = Number.parseFloat(searchParams.get("minAmount") || "0")
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
       // Update user's account balance
       const account = await Account.findOneAndUpdate(
-        { user: new mongoose.Types.ObjectId(payload.id) },
+        { user: payload.id },
         {
           $inc: { [`balances.${currency}`]: blockchainTx.amount },
           $push: {
@@ -86,6 +86,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         },
         { new: true, upsert: true },
       )
+      account.save()
 
       return NextResponse.json({ status: "confirmed", txHash: blockchainTx.txHash })
     }

@@ -1,7 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { getCurrentUser, login, logout as apiLogout, type User } from "@/lib/api/auth"
+import { getCurrentUser, login, logout as apiLogout, changePassword as apiChangePassword, type User } from "@/lib/api/auth"
+import { useTheme } from 'next-themes';
 
 interface UserContextType {
   user: User | null
@@ -10,6 +11,8 @@ interface UserContextType {
   login: (email: string, password: string) => Promise<User | null>
   logout: () => Promise<boolean>
   updateUser: (userData: Partial<User>) => Promise<boolean>
+  changePassword: (current: string, next: string) => Promise<boolean>
+  fetchUser: () => Promise<void>
 }
 
 const UserContext = createContext<UserContextType | null>(null)
@@ -30,24 +33,28 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const { theme, setTheme } = useTheme()
+
+  const fetchUser = async () => {
+    setLoading(true)
+    try {
+      const userData = await getCurrentUser()
+      setUser(userData)
+
+      // Load profile image from localStorage if available
+      const userTheme = userData?.preferences?.theme
+      if (userTheme) setTheme(userTheme)
+      if (userData && localStorage.getItem("profileImage")) {
+        // We don't need to do anything here as the Avatar component will handle this
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Failed to fetch user"))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userData = await getCurrentUser()
-        setUser(userData)
-
-        // Load profile image from localStorage if available
-        if (userData && localStorage.getItem("profileImage")) {
-          // We don't need to do anything here as the Avatar component will handle this
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error("Failed to fetch user"))
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchUser()
   }, [])
 
@@ -57,6 +64,8 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     try {
       const userData = await login({ email, password })
       setUser(userData)
+      setPrefs(userData?.preferences);
+      setTheme(userData.preferences.theme);
       return userData
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Login failed"))
@@ -82,7 +91,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     }
   }
 
-  const updateUser = async (userData: Partial<User>) => {
+  const updateUser = async (userData: Partial<User> & {preferences?: User['preferences']}) => {
     if (!user) return false
 
     setLoading(true)
@@ -91,6 +100,10 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       // For now, we'll just update the local state
       setUser({ ...user, ...userData })
 
+      if (userData.preferences?.theme) {
+        setTheme(userData.preferences.theme)
+      }
+
       // Store in localStorage for persistence
       localStorage.setItem("userData", JSON.stringify({ ...user, ...userData }))
 
@@ -98,6 +111,15 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Update failed"))
       return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const changePassword = async (current: string, next: string) => {
+    setLoading(true)
+    try {
+      return await apiChangePassword(current, next)
     } finally {
       setLoading(false)
     }
@@ -112,9 +134,15 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         login: loginUser,
         logout: logoutUser,
         updateUser,
+        changePassword,
+        fetchUser,
       }}
     >
       {children}
     </UserContext.Provider>
   )
 }
+function setPrefs(preferences: { defaultCurrency: string; theme: "light" | "dark" | "system"; emailNotifications: { marketUpdates: boolean; securityAlerts: boolean; transactionNotifications: boolean; newsletter: boolean; }; } | undefined) {
+  throw new Error("Function not implemented.");
+}
+

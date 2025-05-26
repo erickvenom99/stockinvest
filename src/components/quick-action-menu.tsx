@@ -85,7 +85,7 @@ export default function QuickActionMenu({ className }: QuickActionMenuProps) {
       </div>
 
       <Dialog open={state.showActionModal} onOpenChange={(open) => !open && closeModal()}>
-        <DialogContent className="sm:max-w-[425px] border-0 rounded-xl shadow-xl bg-background sm:top-[50%] sm:translate-y-[-50%] bottom-0 top-auto h-[95vh] max-h-[100dvh] flex flex-col overflow-hidden">
+        <DialogContent className="sm:max-w-[425px] border-0 rounded-xl shadow-xl bg-background top-1/2 left-1/2 w-full max-w-full sm:w-auto -translate-x-1/2 -translate-y-1/2 h-[95vh] max-h-[100dvh] flex flex-col overflow-hidden">
           <div className="absolute inset-0 rounded-xl border-2 border-primary/10 backdrop-blur-sm" />
           <div className="relative z-10 h-full flex flex-col">
             <DialogHeader className="shrink-0 px-6 pt-6 pb-3">

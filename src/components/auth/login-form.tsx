@@ -16,7 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Input } from "../ui/input";
 import type { z } from "zod";
-import { MailIcon, LockIcon } from "lucide-react";
+import { MailIcon, LockIcon, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from '@/contexts/user/user-context';
@@ -39,40 +39,26 @@ const LoginForm = () => {
   });
 
   const onSubmit = async (data: FormData) => {
-    setLoading(true);
     setError(null);
-
     if (!recaptchaValue) {
-      setLoading(false);
       setError("Please complete the CAPTCHA verification");
       return;
     }
 
+    setLoading(true);
     try {
       const response = await fetch("/api/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...data,
-          recaptchaToken: recaptchaValue,
-        }),
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ ...data, recaptchaToken: recaptchaValue }),
       });
-
       const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Login failed');
-      }
-
+      if (!response.ok) throw new Error(responseData.error || 'Login failed');
       await fetchUser();
+      await new Promise((resolve) => setTimeout(resolve, 500))
       router.push('/dashboard');
-    } catch (error) {
-      console.error("Login error:", error);
-      setError(
-        error instanceof Error ? error.message : "An unexpected error occurred"
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
@@ -85,15 +71,26 @@ const LoginForm = () => {
       backButtonHref="/auth/register"
       backButtonLabel="Don't have an account? Register Here"
     >
+      {/* Spinner Overlay */}
+      {loading && (
+        <div className="fixed inset-0 flex items-center justify-center bg-white/80 dark:bg-black/60 z-50">
+          <Loader2 className="animate-spin h-16 w-16 text-primary" />
+          <span className="sr-only">Logging in...</span>
+        </div>
+      )}
+
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className={`space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+        >
           <div className="space-y-4">
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email<span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>Email <span className="text-red-500">*</span></FormLabel>
                   <div className="relative">
                     <MailIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <FormControl>

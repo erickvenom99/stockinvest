@@ -7,6 +7,16 @@ export interface User {
   fullname: string
   email: string
   isVerified?: boolean
+  preferences?: {
+    defaultCurrency: string
+    theme: 'light' | 'dark' | 'system'
+    emailNotifications: {
+      marketUpdates: boolean
+      securityAlerts: boolean
+      transactionNotifications: boolean
+      newsletter: boolean
+    }
+  }
 }
 
 export interface LoginParams {
@@ -74,7 +84,7 @@ export async function register(params: RegisterParams): Promise<User | null> {
 
 export async function getCurrentUser(): Promise<User | null> {
   try {
-    const response = await fetch("/api/current-user")
+    const response = await fetch("/api/account")
 
     if (!response.ok) {
       return null
@@ -96,6 +106,33 @@ export async function logout(): Promise<boolean> {
     return response.ok
   } catch (error) {
     console.error("Logout failed:", error)
+    return false
+  }
+}
+
+export async function changePassword(current: string, next: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/account/password', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        currentPassword: current,
+        newPassword: next,
+      }),
+    })
+
+    if (!res.ok) {
+      const { error } = await res.json()
+      throw new Error(error || 'Password change failed')
+    }
+
+    toast.success('Password updated successfully')
+    return true
+  } catch (error) {
+    console.error('Password update failed: ', error)
+    toast.error('Password update failed', {
+      description: error instanceof Error ? error.message: 'Unknown error'
+    })
     return false
   }
 }

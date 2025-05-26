@@ -11,12 +11,22 @@ import QuickActionMenu from "@/components/quick-action-menu"
 import { fetchMarketData, type CryptoData } from "@/lib/api/market"
 import { fetchPortfolioData, type PortfolioSummary } from "@/lib/api/portfolio"
 import PortfolioChart from "@/components/portfolio-chart"
+import MarketRow from "@/components/MarketRow"
 
 export default function DashboardPage() {
   const [marketData, setMarketData] = useState<CryptoData[]>([])
   const [portfolioData, setPortfolioData] = useState<PortfolioSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [favorites, setFavorites] = useState<string[]>([])
+
+  const toggleFavorite = (coinId: string) => {
+  setFavorites((prev) =>
+    prev.includes(coinId) ? prev.filter((id) => id !== coinId) : [...prev, coinId]
+  )
+}
+
 
   useEffect(() => {
     let isMounted = true
@@ -79,6 +89,7 @@ export default function DashboardPage() {
   }
 
   const { change24h, changeValue } = calculateChange()
+  console.log('PortfolioData', portfolioData)
 
   if (loading) {
     return (
@@ -184,7 +195,7 @@ export default function DashboardPage() {
 
       {/* Section 3: Market Overview */}
       <Card>
-        <CardHeader className="flex justify-between">
+        <CardHeader className="flex flex-col justify-between sm:flex-row gap-2">
           <h3 className="text-lg font-semibold">Market Overview</h3>
           {/* Live Status Indicator */}
           <div className="flex items-center gap-2 mb-4">
@@ -200,75 +211,16 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {marketData.slice(0, 10).map((coin) => {
-              const isPositive = coin.price_change_percentage_24h >= 0
-              const currentPrice = coin.current_price
-              const priceDecimal = currentPrice < 1 ? 6 : 2 //currentPrice < 10 ? 4 : 2
-
-              return (
-                <motion.div
-                  key={coin.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg transition-colors",
-                    isPositive ? "bg-green-50/50" : "bg-red-50/50",
-                  )}
-                >
-                  <div className="flex items-center space-x-3">
-                    {coin.image && (
-                      <div className="relative w-8 h-8">
-                        <Image
-                          src={coin.image || "/placeholder.svg"}
-                          alt={coin.name}
-                          width={32}
-                          height={32}
-                          className="rounded-full object-contain"
-                          unoptimized
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <div className="font-medium">{coin.name}</div>
-                      <div className="text-sm text-muted-foreground">{coin.symbol.toUpperCase()}</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={currentPrice}
-                        initial={{ y: isPositive ? 10 : -10, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className={cn(
-                          "font-medium",
-                          // isPositive ? 'text-green-600' : 'text-red-600'
-                        )}
-                      >
-                        $
-                        {currentPrice.toLocaleString(undefined, {
-                          minimumFractionDigits: priceDecimal,
-                          maximumFractionDigits: priceDecimal,
-                        })}
-                      </motion.div>
-                    </AnimatePresence>
-                    <div
-                      className={cn(
-                        "text-sm flex items-center justify-end gap-1",
-                        isPositive ? "text-green-500" : "text-red-500",
-                      )}
-                    >
-                      {isPositive ? "↑" : "↓"}
-                      {coin.price_change_percentage_24h.toFixed(2)}%
-                    </div>
-                  </div>
-                </motion.div>
-              )
-            })}
+            {marketData.slice(0, 10).map((coin) => (
+            <MarketRow
+              key={coin.id}
+              coin={coin}
+              toggleFavorite={toggleFavorite}
+              isFavorite={favorites.includes(coin.id)}
+            />
+          ))}
           </div>
-        </CardContent>
+      </CardContent>
       </Card>
     </div>
   )

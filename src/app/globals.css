@@ -37,6 +37,12 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+  --card-bg: #fff;
+  --card-fg: #333;
+  --card-bg:          #ffffff;
+  --card-text:        #111827;   /* gray-900 */
+  --card-positive-bg: #d1fae5;   /* green-50 */
+  --card-negative-bg: #fee2e2;   /* red-50 */
 }
 
 .dark {
@@ -71,6 +77,12 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+  --card-bg: #1f2937;     /* Tailwind’s gray-800 */
+  --card-fg: #e5e7eb;     /* Tailwind’s gray-200 */
+  --card-bg:          #1f2937;   /* gray-800 */
+  --card-text:        #e5e7eb;   /* gray-200 */
+  --card-positive-bg: #064e3b;   /* green-900 */
+  --card-negative-bg: #7f1d1d;   /* red-900 */
 }
 
 @theme inline {
