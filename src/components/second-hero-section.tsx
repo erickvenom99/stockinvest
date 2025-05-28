@@ -45,7 +45,7 @@ export function SecondHeroSection() {
           >
             <div className="relative h-[400px] md:h-[500px] w-full overflow-hidden rounded-lg">
               <Image
-                src="/placeholder.svg?height=1000&width=800"
+                src="/assets/images/datadriven.jpg"
                 alt="Investment analytics"
                 fill
                 className="object-cover"
